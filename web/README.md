@@ -4,7 +4,7 @@ This folder contains the phone-friendly frontend intended for GitHub Pages.
 
 ## What it can do now
 
-- Scan by student ID
+- Scan by student ID or phone camera barcode scan
 - Show recent scans
 - Queue pending parent emails
 - Start a new section
@@ -23,4 +23,5 @@ Set the backend URL in the settings card after the backend is deployed. The easi
 - `styles.css`: responsive styling
 - `service-worker.js`: offline shell caching
 - `manifest.webmanifest`: install metadata
+
 

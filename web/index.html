@@ -52,6 +52,7 @@
             <div class="input-row">
               <input id="studentId" name="studentId" type="text" inputmode="numeric" autocomplete="off" placeholder="Try 1001, 1002, or 1003" required />
               <button type="submit">Scan</button>
+              <button id="cameraScanBtn" class="ghost" type="button">Scan card</button>
             </div>
           </form>
           <div class="action-row wrap-row">
@@ -166,8 +167,21 @@
       </main>
     </div>
 
+    <div id="scannerModal" class="scanner-modal" hidden>
+      <div class="scanner-dialog card" role="dialog" aria-modal="true" aria-labelledby="scannerTitle">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Camera Scan</p>
+            <h2 id="scannerTitle">Scan student barcode</h2>
+          </div>
+          <button id="scannerCloseBtn" class="ghost" type="button">Close</button>
+        </div>
+        <div id="scannerMount" class="scanner-mount"></div>
+        <p id="scannerStatus" class="helper scanner-status">Allow camera access, then point the phone at the barcode.</p>
+      </div>
+    </div>
+
+    <script src="./vendor/html5-qrcode.min.js"></script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>
-
-

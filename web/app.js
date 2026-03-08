@@ -78,7 +78,18 @@ const elements = {
   refreshBackendBtn: document.getElementById("refreshBackendBtn"),
   queueEmailBtn: document.getElementById("queueEmailBtn"),
   sendEmailBtn: document.getElementById("sendEmailBtn"),
-  clearPendingBtn: document.getElementById("clearPendingBtn")
+  clearPendingBtn: document.getElementById("clearPendingBtn"),
+  cameraScanBtn: document.getElementById("cameraScanBtn"),
+  scannerModal: document.getElementById("scannerModal"),
+  scannerMount: document.getElementById("scannerMount"),
+  scannerStatus: document.getElementById("scannerStatus"),
+  scannerCloseBtn: document.getElementById("scannerCloseBtn")
+};
+const scannerState = {
+  instance: null,
+  active: false,
+  opening: false,
+  resolving: false
 };
 
 init().catch((error) => {
@@ -102,6 +113,23 @@ function wireEvents() {
   elements.queueEmailBtn.addEventListener("click", handleQueueEmail);
   elements.sendEmailBtn.addEventListener("click", handleSendEmail);
   elements.clearPendingBtn.addEventListener("click", handleClearPending);
+  elements.cameraScanBtn.addEventListener("click", openScanner);
+  elements.scannerCloseBtn.addEventListener("click", () => closeScanner());
+  elements.scannerModal.addEventListener("click", (event) => {
+    if (event.target === elements.scannerModal) {
+      closeScanner();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !elements.scannerModal.hidden) {
+      closeScanner();
+    }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !elements.scannerModal.hidden) {
+      closeScanner();
+    }
+  });
 
   elements.emailHomeToggle.addEventListener("change", async () => {
     if (!state.apiBase) {
@@ -234,7 +262,10 @@ function renderThresholds() {
 
 async function handleScan(event) {
   event.preventDefault();
-  const studentId = elements.studentId.value.trim();
+  await submitStudentId(elements.studentId.value.trim());
+}
+
+async function submitStudentId(studentId) {
   if (!studentId) {
     showMessage("Enter a student ID first.");
     return;
@@ -582,6 +613,162 @@ function normalizeThresholds(thresholds) {
   }));
 }
 
+async function openScanner() {
+  if (scannerState.active || scannerState.opening || scannerState.resolving) {
+    return;
+  }
+
+  if (!window.Html5Qrcode) {
+    showMessage("Camera scanning is not available in this browser.");
+    return;
+  }
+
+  scannerState.opening = true;
+  elements.scannerModal.hidden = false;
+  document.body.classList.add("scanner-open");
+  elements.scannerMount.innerHTML = "";
+  updateScannerStatus("Requesting camera access...");
+
+  try {
+    scannerState.instance = new window.Html5Qrcode("scannerMount");
+    await startScannerInstance(scannerState.instance);
+    scannerState.active = true;
+    updateScannerStatus("Point the camera at the barcode on the ID.");
+  } catch (error) {
+    await closeScanner();
+    showMessage(getScannerErrorMessage(error));
+  } finally {
+    scannerState.opening = false;
+  }
+}
+
+async function startScannerInstance(instance) {
+  const config = {
+    fps: 10,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const width = Math.min(Math.floor(viewfinderWidth * 0.88), 360);
+      return {
+        width,
+        height: Math.max(120, Math.floor(width * 0.45))
+      };
+    },
+    rememberLastUsedCamera: true,
+    formatsToSupport: getScannerFormats()
+  };
+
+  const onSuccess = async (decodedText) => {
+    if (scannerState.resolving) {
+      return;
+    }
+    scannerState.resolving = true;
+
+    const studentId = normalizeDetectedStudentId(decodedText);
+    if (!studentId) {
+      updateScannerStatus("Barcode found, but no student ID could be extracted.");
+      scannerState.resolving = false;
+      return;
+    }
+
+    elements.studentId.value = studentId;
+    updateScannerStatus(`Scanned ${studentId}.`);
+    await closeScanner();
+    await submitStudentId(studentId);
+    scannerState.resolving = false;
+  };
+
+  const onFailure = () => {};
+
+  try {
+    await instance.start({ facingMode: "environment" }, config, onSuccess, onFailure);
+  } catch (error) {
+    const cameras = await window.Html5Qrcode.getCameras();
+    if (!cameras || cameras.length === 0) {
+      throw error;
+    }
+    const preferredCamera = cameras.find((camera) => /back|rear|environment/i.test(camera.label)) || cameras[0];
+    await instance.start(preferredCamera.id, config, onSuccess, onFailure);
+  }
+}
+
+function getScannerFormats() {
+  const formats = window.Html5QrcodeSupportedFormats;
+  if (!formats) {
+    return undefined;
+  }
+  return [
+    formats.CODE_128,
+    formats.CODE_39,
+    formats.CODE_93,
+    formats.CODABAR,
+    formats.EAN_13,
+    formats.EAN_8,
+    formats.ITF,
+    formats.PDF_417,
+    formats.UPC_A,
+    formats.UPC_E,
+    formats.QR_CODE
+  ].filter(Boolean);
+}
+
+function normalizeDetectedStudentId(decodedText) {
+  const raw = String(decodedText || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const digitMatches = raw.match(/\d{4,}/g);
+  if (digitMatches && digitMatches.length > 0) {
+    return digitMatches.sort((left, right) => right.length - left.length)[0];
+  }
+
+  const tokenMatches = raw.match(/[A-Z0-9]{4,}/gi);
+  if (tokenMatches && tokenMatches.length > 0) {
+    return tokenMatches.sort((left, right) => right.length - left.length)[0];
+  }
+
+  return raw;
+}
+
+function updateScannerStatus(message) {
+  elements.scannerStatus.textContent = message;
+}
+
+function getScannerErrorMessage(error) {
+  const message = String(error && error.message ? error.message : error || "");
+  if (/Permission|NotAllowed/i.test(message)) {
+    return "Camera permission was blocked. Allow camera access and try again.";
+  }
+  if (/NotFound|Overconstrained|No camera/i.test(message)) {
+    return "No rear camera was available on this device.";
+  }
+  return "The camera scanner could not start on this phone. You can still type the student ID manually.";
+}
+
+async function closeScanner() {
+  document.body.classList.remove("scanner-open");
+  elements.scannerModal.hidden = true;
+  updateScannerStatus("Allow camera access, then point the phone at the barcode.");
+
+  const instance = scannerState.instance;
+  scannerState.active = false;
+  scannerState.opening = false;
+  scannerState.instance = null;
+
+  if (!instance) {
+    return;
+  }
+
+  try {
+    await instance.stop();
+  } catch {}
+
+  try {
+    await instance.clear();
+  } catch {}
+
+  elements.scannerMount.innerHTML = "";
+}
+
 async function apiFetch(path, options = {}, { admin = false } = {}) {
   if (!state.apiBase) {
     throw new Error("Backend URL is not configured.");
@@ -763,6 +950,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.register("./service-worker.js").catch(() => {});
   }
 }
+
 
 
 

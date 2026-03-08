@@ -30,3 +30,5 @@ Lanyard/pending_scans.json
 Lanyard/sent_emails.json
 Lanyard/settings.json
 Lanyard/*.xlsx
+
+_tmp_html5qrcode_*/
