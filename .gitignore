@@ -32,3 +32,4 @@ Lanyard/settings.json
 Lanyard/*.xlsx
 
 _tmp_html5qrcode_*/
+imports/

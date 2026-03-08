@@ -2,6 +2,12 @@
 
 This repo can now serve Brownsburg High School as two separate phone apps without duplicating the codebase.
 
+The imported Brownsburg desktop build in `Brownsburg High 1.0.2.zip` uses:
+
+- Spreadsheet title: `Brownsburg_High_School_Lanyard_Data`
+- School name: `Brownsburg Community School Corporation`
+- Lanyard tiers: `1-4`, `5-9`, `10-14`, `15+`
+
 ### Live links
 
 - Lanyards: `https://curtisfaughnan.github.io/NewTardyAvon/brownsburg-high-lanyards.html`
@@ -18,13 +24,20 @@ That keeps thresholds, scan history, sections, and pending emails fully separate
 
 ### Apps Script properties for Brownsburg lanyards
 
-- `SHEET_ID` = spreadsheet id for the Brownsburg lanyards sheet
+- `SHEET_ID` = optional if you create the Apps Script from inside the Brownsburg lanyards spreadsheet
 - `SCHOOL_NAME` = `Brownsburg High School`
 - `APP_TITLE` = `Lanyard Tracker`
 - `COUNT_LABEL` = `Total lanyard violations`
 - `INCIDENT_SINGULAR` = `lanyard violation`
 - `INCIDENT_PLURAL` = `lanyard violations`
 - `ADMIN_KEY` = your Brownsburg lanyards admin key
+
+Recommended threshold rows for Brownsburg lanyards:
+
+- `Tier 1`: `1` to `4`
+- `Tier 2`: `5` to `9`
+- `Tier 3`: `10` to `14`
+- `Tier 4`: `15` to `9999`
 
 ### Apps Script properties for Brownsburg tardies
 
@@ -53,4 +66,4 @@ That keeps thresholds, scan history, sections, and pending emails fully separate
 
 - Threshold colors, tiers, section resets, and duplicate-per-day protection stay separate per backend.
 - The two Brownsburg pages share the same frontend code, so future fixes only need to be shipped once.
-- The Brownsburg manifests still reuse the current icon file. Replace `web/assets/Avon_Crest.png` later if you want Brownsburg branding on installed home-screen icons.
+- The Brownsburg phone pages now use the bulldog branding extracted from the legacy Brownsburg desktop app.

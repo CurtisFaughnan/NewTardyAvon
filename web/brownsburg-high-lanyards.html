@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Brownsburg High School Lanyard Tracker</title>
-    <link rel="manifest" href="./manifest-brownsburg-high-lanyards.webmanifest?v=20260308h" />
-    <link rel="stylesheet" href="./styles.css?v=20260308h" />
+    <link rel="manifest" href="./manifest-brownsburg-high-lanyards.webmanifest?v=20260308i" />
+    <link rel="stylesheet" href="./styles.css?v=20260308i" />
   </head>
   <body>
     <div class="page-shell">
       <header class="topbar">
         <div class="brand-inline">
-          <div class="brand-badge" aria-hidden="true">BHS</div>
+          <img class="brand-mark" src="./assets/Brownsburg_Bulldog.webp" alt="Brownsburg Bulldog" />
           <div>
             <p id="brandEyebrow" class="eyebrow">Brownsburg High School</p>
             <h1 id="brandTitle">Lanyard Tracker</h1>
@@ -210,10 +210,16 @@
         appTitle: "Lanyard Tracker",
         countLabel: "Total lanyard violations",
         incidentSingular: "lanyard violation",
-        incidentPlural: "lanyard violations"
+        incidentPlural: "lanyard violations",
+        defaultThresholds: [
+          { min: 1, max: 4, title: "Tier 1", color: [0.7, 1, 0.7] },
+          { min: 5, max: 9, title: "Tier 2", color: [1, 1, 0.6] },
+          { min: 10, max: 14, title: "Tier 3", color: [1, 0.8, 0.5] },
+          { min: 15, max: 9999, title: "Tier 4", color: [1, 0.6, 0.6] }
+        ]
       };
     </script>
-    <script src="./vendor/html5-qrcode.min.js?v=20260308h"></script>
-    <script type="module" src="./app.js?v=20260308h"></script>
+    <script src="./vendor/html5-qrcode.min.js?v=20260308i"></script>
+    <script type="module" src="./app.js?v=20260308i"></script>
   </body>
 </html>

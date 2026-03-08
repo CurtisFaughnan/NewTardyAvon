@@ -125,11 +125,21 @@ function assertAdmin_(request) {
 }
 
 function getSpreadsheet_() {
-  return SpreadsheetApp.openById(getSheetId_());
+  const configuredSheetId = getSheetId_();
+  if (configuredSheetId) {
+    return SpreadsheetApp.openById(configuredSheetId);
+  }
+
+  const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (activeSpreadsheet) {
+    return activeSpreadsheet;
+  }
+
+  return SpreadsheetApp.openById(DEFAULT_SHEET_ID);
 }
 
 function getSheetId_() {
-  return PropertiesService.getScriptProperties().getProperty('SHEET_ID') || DEFAULT_SHEET_ID;
+  return PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
 }
 
 function getAdminKey_() {

@@ -1,3 +1,10 @@
+const DEFAULT_APP_THRESHOLDS = [
+  { min: 1, max: 4, title: "Tier 1", color: [0.31, 0.49, 0.39], hex: "#4f7d63" },
+  { min: 5, max: 9, title: "Tier 2", color: [0.83, 0.61, 0.17], hex: "#d39b2b" },
+  { min: 10, max: 14, title: "Email Home", color: [0.73, 0.38, 0.33], hex: "#b96253" },
+  { min: 15, max: 9999, title: "Tier 4", color: [0.09, 0.2, 0.3], hex: "#17324d" }
+];
+
 const PROFILE_CONFIGS = {
   "brownsburg-high-lanyards": {
     profileId: "brownsburg-high-lanyards",
@@ -5,7 +12,13 @@ const PROFILE_CONFIGS = {
     appTitle: "Lanyard Tracker",
     countLabel: "Total lanyard violations",
     incidentSingular: "lanyard violation",
-    incidentPlural: "lanyard violations"
+    incidentPlural: "lanyard violations",
+    defaultThresholds: [
+      { min: 1, max: 4, title: "Tier 1", color: [0.7, 1, 0.7] },
+      { min: 5, max: 9, title: "Tier 2", color: [1, 1, 0.6] },
+      { min: 10, max: 14, title: "Tier 3", color: [1, 0.8, 0.5] },
+      { min: 15, max: 9999, title: "Tier 4", color: [1, 0.6, 0.6] }
+    ]
   },
   "brownsburg-high-tardies": {
     profileId: "brownsburg-high-tardies",
@@ -20,7 +33,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308h";
+const ASSET_VERSION = "20260308i";
 
 const sampleStudents = {
   "1001": {
@@ -59,7 +72,7 @@ const defaultState = {
   adminKey: "",
   backendConnected: false,
   currentSection: 1,
-  emailHomeEnabled: true,
+  emailHomeEnabled: typeof RUNTIME_CONFIG.defaultEmailHomeEnabled === "boolean" ? RUNTIME_CONFIG.defaultEmailHomeEnabled : true,
   lastResetTime: "Never",
   studentTotals: { "1001": 3, "1002": 8, "1003": 1 },
   scannedKeys: {},
@@ -67,12 +80,7 @@ const defaultState = {
   pendingEmails: [],
   queue: [],
   lastStudent: null,
-  thresholds: [
-    { min: 1, max: 4, title: "Tier 1", color: [0.31, 0.49, 0.39], hex: "#4f7d63" },
-    { min: 5, max: 9, title: "Tier 2", color: [0.83, 0.61, 0.17], hex: "#d39b2b" },
-    { min: 10, max: 14, title: "Email Home", color: [0.73, 0.38, 0.33], hex: "#b96253" },
-    { min: 15, max: 9999, title: "Tier 4", color: [0.09, 0.2, 0.3], hex: "#17324d" }
-  ]
+  thresholds: normalizeThresholds(RUNTIME_CONFIG.defaultThresholds || DEFAULT_APP_THRESHOLDS)
 };
 
 const state = loadState();
@@ -1311,7 +1319,8 @@ function resolveRuntimeConfig() {
       appTitle: "Lanyard Tracker",
       countLabel: "Total violations",
       incidentSingular: "violation",
-      incidentPlural: "violations"
+      incidentPlural: "violations",
+      defaultThresholds: clone(DEFAULT_APP_THRESHOLDS)
     };
   }
 
@@ -1326,7 +1335,11 @@ function resolveRuntimeConfig() {
     appTitle: String(inlineConfig.appTitle || profileConfig.appTitle || "Lanyard Tracker"),
     countLabel: String(inlineConfig.countLabel || profileConfig.countLabel || "Total violations"),
     incidentSingular: String(inlineConfig.incidentSingular || profileConfig.incidentSingular || "violation"),
-    incidentPlural: String(inlineConfig.incidentPlural || profileConfig.incidentPlural || "violations")
+    incidentPlural: String(inlineConfig.incidentPlural || profileConfig.incidentPlural || "violations"),
+    defaultEmailHomeEnabled: typeof inlineConfig.defaultEmailHomeEnabled === "boolean"
+      ? inlineConfig.defaultEmailHomeEnabled
+      : (typeof profileConfig.defaultEmailHomeEnabled === "boolean" ? profileConfig.defaultEmailHomeEnabled : true),
+    defaultThresholds: clone(inlineConfig.defaultThresholds || profileConfig.defaultThresholds || DEFAULT_APP_THRESHOLDS)
   };
 }
 
