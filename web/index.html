@@ -16,7 +16,7 @@
           <div>
             <p class="eyebrow">Phone-ready GitHub shell</p>
             <h1>Lanyard Tracker</h1>
-            <p class="deck">A mobile-first scan workflow that can be published from GitHub Pages and connected to a private backend for Google Sheets and email.</p>
+            <p class="deck">A mobile-first scan workflow that can be published from GitHub Pages and connected to a free Google Apps Script backend or a private server.</p>
           </div>
         </div>
         <div class="status-grid">
@@ -75,7 +75,7 @@
           </div>
           <div id="studentEmpty" class="empty-state">
             <p>The last scanned student will appear here.</p>
-            <p class="helper">Leave the API blank for mock mode. Add a backend URL to connect live data.</p>
+            <p class="helper">Leave the API blank for mock mode. Add an Apps Script `/exec` URL or another backend URL to connect live data.</p>
           </div>
           <div id="studentDetail" class="student-detail" hidden>
             <div>
@@ -144,14 +144,14 @@
           <div class="stack-grid">
             <label class="stack-field" for="apiBaseInput">
               <span>API base URL</span>
-              <input id="apiBaseInput" type="url" placeholder="https://your-backend.example" />
+              <input id="apiBaseInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
             </label>
             <label class="stack-field" for="adminKeyInput">
               <span>Admin key</span>
               <input id="adminKeyInput" type="password" placeholder="Stored only in this browser" />
             </label>
           </div>
-          <p class="helper">The frontend can stay on GitHub Pages. Keep the backend private and store secrets there, not in this repo.</p>
+          <p class="helper">The frontend can stay on GitHub Pages. Use your Apps Script `/exec` URL here for a free backend, or keep using a private Node backend if you prefer.</p>
         </section>
 
         <section class="card threshold-card">
@@ -169,3 +169,5 @@
     <script type="module" src="./app.js"></script>
   </body>
 </html>
+
+

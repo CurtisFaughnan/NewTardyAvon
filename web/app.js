@@ -587,6 +587,10 @@ async function apiFetch(path, options = {}, { admin = false } = {}) {
     throw new Error("Backend URL is not configured.");
   }
 
+  if (isAppsScriptBackend()) {
+    return apiFetchAppsScript(path, options, { admin });
+  }
+
   const headers = new Headers(options.headers || {});
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -611,13 +615,74 @@ async function apiFetch(path, options = {}, { admin = false } = {}) {
   }
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
+  const data = safeJsonParse(text, {});
   if (!response.ok) {
     const requestError = new Error(data.error || `Request failed (${response.status})`);
     requestError.status = response.status;
     throw requestError;
   }
   return data;
+}
+
+function isAppsScriptBackend() {
+  return /script\.google(?:usercontent)?\.com|\/macros\/s\//i.test(state.apiBase);
+}
+
+async function apiFetchAppsScript(path, options = {}, { admin = false } = {}) {
+  const endpoint = String(path).replace(/^\/api\//, "");
+  const method = String(options.method || "GET").toUpperCase();
+  const payload = options.body ? safeJsonParse(options.body, {}) : {};
+
+  if (admin) {
+    if (!state.adminKey) {
+      throw new Error("Enter the admin key in the settings card first.");
+    }
+    payload.adminKey = state.adminKey;
+  }
+
+  let response;
+  try {
+    if (method === "GET") {
+      const url = new URL(state.apiBase);
+      url.searchParams.set("endpoint", endpoint);
+      for (const [key, value] of Object.entries(payload)) {
+        if (value === null || typeof value === "undefined" || typeof value === "object") {
+          continue;
+        }
+        url.searchParams.set(key, String(value));
+      }
+      response = await fetch(url.toString(), { method: "GET" });
+    } else {
+      const form = new URLSearchParams();
+      form.set("payload", JSON.stringify({ endpoint, ...payload }));
+      response = await fetch(state.apiBase, {
+        method: "POST",
+        body: form
+      });
+    }
+  } catch (error) {
+    const networkError = new Error("Unable to reach the Apps Script backend.");
+    networkError.retriable = true;
+    throw networkError;
+  }
+
+  const text = await response.text();
+  const data = safeJsonParse(text, {});
+  if (!response.ok || data.error) {
+    const requestError = new Error(data.error || `Request failed (${response.status})`);
+    requestError.status = response.status;
+    requestError.retriable = !response.ok && response.status >= 500;
+    throw requestError;
+  }
+  return data;
+}
+
+function safeJsonParse(text, fallback = {}) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
 }
 
 function makeQueuedScan(studentId) {
@@ -698,6 +763,8 @@ function registerServiceWorker() {
     navigator.serviceWorker.register("./service-worker.js").catch(() => {});
   }
 }
+
+
 
 
 
