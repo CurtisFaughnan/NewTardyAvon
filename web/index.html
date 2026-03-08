@@ -5,87 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lanyard Tracker</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260308b" />
-    <link rel="stylesheet" href="./styles.css?v=20260308b" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260308c" />
+    <link rel="stylesheet" href="./styles.css?v=20260308c" />
   </head>
   <body>
     <div class="page-shell">
-      <header class="masthead card">
-        <div class="brand-block">
+      <header class="topbar">
+        <div class="brand-inline">
           <img class="brand-mark" src="./assets/Avon_Crest.png" alt="School crest" />
           <div>
-            <p class="eyebrow">Phone-ready GitHub shell</p>
+            <p class="eyebrow">Avon North</p>
             <h1>Lanyard Tracker</h1>
-            <p class="deck">A mobile-first scan workflow that can be published from GitHub Pages and connected to a free Google Apps Script backend or a private server.</p>
           </div>
         </div>
-        <div class="status-grid">
-          <div class="status-card">
-            <span>Backend</span>
-            <strong id="modeBadge">Mock mode</strong>
-          </div>
-          <div class="status-card">
-            <span>Queued scans</span>
-            <strong id="queueCount">0</strong>
-          </div>
-          <div class="status-card">
-            <span>Section</span>
-            <strong id="sectionCount">1</strong>
-          </div>
-          <div class="status-card">
-            <span>Last reset</span>
-            <strong id="resetBadge">Never</strong>
-          </div>
-        </div>
+        <button id="settingsOpenBtn" class="ghost compact-button" type="button">Admin</button>
       </header>
 
-      <main class="layout-grid">
-        <section class="card spotlight-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Scan</p>
-              <h2>Lookup student ID</h2>
-            </div>
-          </div>
+      <main class="main-stack">
+        <section class="card scan-card">
+          <p class="eyebrow">Scan</p>
+          <button id="cameraScanBtn" class="camera-cta" type="button">Scan card</button>
           <form id="scanForm" class="scan-form">
-            <label for="studentId">Student ID</label>
+            <label for="studentId">Student ID #</label>
             <div class="input-row">
-              <input id="studentId" name="studentId" type="text" inputmode="numeric" autocomplete="off" placeholder="Try 1001, 1002, or 1003" required />
-              <button type="submit">Scan</button>
-              <button id="cameraScanBtn" class="ghost" type="button">Scan card</button>
+              <input id="studentId" name="studentId" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter student ID #" required />
+              <button type="submit">Enter</button>
             </div>
           </form>
-          <div class="action-row wrap-row">
-            <button id="newSectionBtn" class="secondary" type="button">Start new section</button>
-            <button id="syncBtn" class="ghost" type="button">Try sync</button>
-            <button id="refreshBackendBtn" class="ghost" type="button">Refresh backend</button>
-          </div>
           <p id="scanMessage" class="message">Ready to scan.</p>
         </section>
 
         <section class="card student-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Result</p>
-              <h2>Student detail</h2>
-            </div>
-            <div class="inline-actions">
-              <button id="queueEmailBtn" class="ghost" type="button">Queue email</button>
-              <button id="sendEmailBtn" class="ghost" type="button">Send email</button>
-            </div>
-          </div>
+          <p class="eyebrow">Student</p>
+          <h2>Current result</h2>
           <div id="studentEmpty" class="empty-state">
-            <p>The last scanned student will appear here.</p>
-            <p class="helper">Leave the API blank for mock mode. Add an Apps Script `/exec` URL or another backend URL to connect live data.</p>
+            <p>Scan a barcode or enter a student ID to view details.</p>
           </div>
           <div id="studentDetail" class="student-detail" hidden>
             <div>
               <span>Name</span>
               <strong id="studentName"></strong>
-            </div>
-            <div>
-              <span>Student ID</span>
-              <strong id="studentCode"></strong>
             </div>
             <div>
               <span>Team</span>
@@ -99,72 +58,130 @@
               <span>Total violations</span>
               <strong id="studentCount"></strong>
             </div>
-            <div>
+            <div class="detail-wide">
               <span>Threshold</span>
               <strong id="studentThreshold"></strong>
             </div>
-            <div>
-              <span>Parent email</span>
-              <strong id="studentEmail"></strong>
-            </div>
           </div>
-        </section>
-
-        <section class="card list-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Activity</p>
-              <h2>Recent scans</h2>
-            </div>
-          </div>
-          <ul id="recentScans" class="data-list"></ul>
-        </section>
-
-        <section class="card list-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Follow-up</p>
-              <h2>Pending parent emails</h2>
-            </div>
-            <button id="clearPendingBtn" class="ghost" type="button">Clear</button>
-          </div>
-          <ul id="pendingEmails" class="data-list"></ul>
-        </section>
-
-        <section class="card settings-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Settings</p>
-              <h2>Connection</h2>
-            </div>
-          </div>
-          <label class="toggle-row" for="emailHomeToggle">
-            <span>Email home enabled</span>
-            <input id="emailHomeToggle" type="checkbox" />
-          </label>
-          <div class="stack-grid">
-            <label class="stack-field" for="apiBaseInput">
-              <span>API base URL</span>
-              <input id="apiBaseInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
-            </label>
-            <label class="stack-field" for="adminKeyInput">
-              <span>Admin key</span>
-              <input id="adminKeyInput" type="password" placeholder="Stored only in this browser" />
-            </label>
-          </div>
-          <p class="helper">The frontend can stay on GitHub Pages. Use your Apps Script `/exec` URL here for a free backend, or keep using a private Node backend if you prefer.</p>
-        </section>
-
-        <section class="card threshold-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">Policy</p>
-              <h2>Thresholds</h2>
-            </div>
-          </div>
-          <div id="thresholdList" class="threshold-list"></div>
         </section>
       </main>
+    </div>
+
+    <div id="settingsModal" class="settings-modal" hidden>
+      <div class="settings-dialog card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Admin</p>
+            <h2 id="settingsTitle">Settings</h2>
+          </div>
+          <div class="inline-actions">
+            <span id="settingsLockBadge" class="lock-badge">Locked</span>
+            <button id="settingsCloseBtn" class="ghost" type="button">Close</button>
+          </div>
+        </div>
+
+        <section class="settings-section lock-section">
+          <label class="stack-field" for="adminUnlockInput">
+            <span>Admin key</span>
+            <input id="adminUnlockInput" type="password" placeholder="Enter admin key to unlock settings" />
+          </label>
+          <div class="action-row wrap-row">
+            <button id="unlockSettingsBtn" type="button">Unlock</button>
+            <button id="lockSettingsBtn" class="ghost" type="button">Lock</button>
+          </div>
+          <p id="settingsMessage" class="helper">Enter the admin key to open connection and admin tools.</p>
+        </section>
+
+        <div id="adminSettingsPanel" class="admin-settings-panel" hidden>
+          <section class="settings-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Connection</p>
+                <h3>Backend</h3>
+              </div>
+              <strong id="modeBadge" class="section-badge">Mock mode</strong>
+            </div>
+            <div class="summary-grid">
+              <div class="summary-chip">
+                <span>Queued scans</span>
+                <strong id="queueCount">0</strong>
+              </div>
+              <div class="summary-chip">
+                <span>Section</span>
+                <strong id="sectionCount">1</strong>
+              </div>
+              <div class="summary-chip">
+                <span>Last reset</span>
+                <strong id="resetBadge">Never</strong>
+              </div>
+            </div>
+            <label class="toggle-row" for="emailHomeToggle">
+              <span>Email home enabled</span>
+              <input id="emailHomeToggle" type="checkbox" />
+            </label>
+            <div class="stack-grid">
+              <label class="stack-field" for="apiBaseInput">
+                <span>API base URL</span>
+                <input id="apiBaseInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+              </label>
+              <label class="stack-field" for="adminKeyInput">
+                <span>Saved admin key</span>
+                <input id="adminKeyInput" type="password" placeholder="Stored only in this browser" />
+              </label>
+            </div>
+            <div class="action-row wrap-row">
+              <button id="refreshBackendBtn" class="ghost" type="button">Refresh backend</button>
+              <button id="syncBtn" class="ghost" type="button">Try sync</button>
+              <button id="newSectionBtn" class="secondary" type="button">Start new section</button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Actions</p>
+                <h3>Current student</h3>
+              </div>
+            </div>
+            <p class="helper">These actions use the last scanned student.</p>
+            <div class="action-row wrap-row">
+              <button id="queueEmailBtn" class="ghost" type="button">Queue email</button>
+              <button id="sendEmailBtn" class="ghost" type="button">Send email</button>
+              <button id="clearPendingBtn" class="ghost" type="button">Clear pending</button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Activity</p>
+                <h3>Recent scans</h3>
+              </div>
+            </div>
+            <ul id="recentScans" class="data-list"></ul>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Follow-up</p>
+                <h3>Pending parent emails</h3>
+              </div>
+            </div>
+            <ul id="pendingEmails" class="data-list"></ul>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Policy</p>
+                <h3>Thresholds</h3>
+              </div>
+            </div>
+            <div id="thresholdList" class="threshold-list"></div>
+          </section>
+        </div>
+      </div>
     </div>
 
     <div id="scannerModal" class="scanner-modal" hidden>
@@ -181,7 +198,7 @@
       </div>
     </div>
 
-    <script src="./vendor/html5-qrcode.min.js?v=20260308b"></script>
-    <script type="module" src="./app.js?v=20260308b"></script>
+    <script src="./vendor/html5-qrcode.min.js?v=20260308c"></script>
+    <script type="module" src="./app.js?v=20260308c"></script>
   </body>
 </html>

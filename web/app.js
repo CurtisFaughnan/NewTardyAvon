@@ -1,6 +1,6 @@
 const STORAGE_KEY = "lanyard-mobile-shell-v2";
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308b";
+const ASSET_VERSION = "20260308c";
 
 const sampleStudents = {
   "1001": {
@@ -55,6 +55,15 @@ const elements = {
   form: document.getElementById("scanForm"),
   studentId: document.getElementById("studentId"),
   scanMessage: document.getElementById("scanMessage"),
+  settingsOpenBtn: document.getElementById("settingsOpenBtn"),
+  settingsModal: document.getElementById("settingsModal"),
+  settingsCloseBtn: document.getElementById("settingsCloseBtn"),
+  settingsLockBadge: document.getElementById("settingsLockBadge"),
+  settingsMessage: document.getElementById("settingsMessage"),
+  adminUnlockInput: document.getElementById("adminUnlockInput"),
+  unlockSettingsBtn: document.getElementById("unlockSettingsBtn"),
+  lockSettingsBtn: document.getElementById("lockSettingsBtn"),
+  adminSettingsPanel: document.getElementById("adminSettingsPanel"),
   queueCount: document.getElementById("queueCount"),
   sectionCount: document.getElementById("sectionCount"),
   resetBadge: document.getElementById("resetBadge"),
@@ -65,12 +74,10 @@ const elements = {
   studentEmpty: document.getElementById("studentEmpty"),
   studentDetail: document.getElementById("studentDetail"),
   studentName: document.getElementById("studentName"),
-  studentCode: document.getElementById("studentCode"),
   studentTeam: document.getElementById("studentTeam"),
   studentYear: document.getElementById("studentYear"),
   studentCount: document.getElementById("studentCount"),
   studentThreshold: document.getElementById("studentThreshold"),
-  studentEmail: document.getElementById("studentEmail"),
   emailHomeToggle: document.getElementById("emailHomeToggle"),
   apiBaseInput: document.getElementById("apiBaseInput"),
   adminKeyInput: document.getElementById("adminKeyInput"),
@@ -92,6 +99,10 @@ const scannerState = {
   opening: false,
   resolving: false
 };
+const uiState = {
+  settingsOpen: false,
+  settingsUnlocked: false
+};
 
 init().catch((error) => {
   showMessage(error.message || "Unable to initialize the app.");
@@ -108,6 +119,10 @@ async function init() {
 
 function wireEvents() {
   elements.form.addEventListener("submit", handleScan);
+  elements.settingsOpenBtn.addEventListener("click", openSettings);
+  elements.settingsCloseBtn.addEventListener("click", closeSettings);
+  elements.unlockSettingsBtn.addEventListener("click", handleSettingsUnlock);
+  elements.lockSettingsBtn.addEventListener("click", handleSettingsLock);
   elements.newSectionBtn.addEventListener("click", handleNewSection);
   elements.syncBtn.addEventListener("click", handleSync);
   elements.refreshBackendBtn.addEventListener("click", bootstrapFromApi);
@@ -116,6 +131,11 @@ function wireEvents() {
   elements.clearPendingBtn.addEventListener("click", handleClearPending);
   elements.cameraScanBtn.addEventListener("click", openScanner);
   elements.scannerCloseBtn.addEventListener("click", () => closeScanner());
+  elements.settingsModal.addEventListener("click", (event) => {
+    if (event.target === elements.settingsModal) {
+      closeSettings();
+    }
+  });
   elements.scannerModal.addEventListener("click", (event) => {
     if (event.target === elements.scannerModal) {
       closeScanner();
@@ -124,6 +144,10 @@ function wireEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.scannerModal.hidden) {
       closeScanner();
+      return;
+    }
+    if (event.key === "Escape" && !elements.settingsModal.hidden) {
+      closeSettings();
     }
   });
   document.addEventListener("visibilitychange", () => {
@@ -169,6 +193,7 @@ function wireEvents() {
 
   elements.adminKeyInput.addEventListener("change", () => {
     state.adminKey = elements.adminKeyInput.value.trim();
+    elements.adminUnlockInput.value = state.adminKey;
     persist();
   });
 }
@@ -197,9 +222,15 @@ function render() {
   elements.sectionCount.textContent = String(state.currentSection || 1);
   elements.resetBadge.textContent = formatResetTime(state.lastResetTime);
   elements.modeBadge.textContent = state.apiBase ? (state.backendConnected ? "Connected" : "Configured") : "Mock mode";
+  elements.settingsLockBadge.textContent = uiState.settingsUnlocked ? "Unlocked" : "Locked";
+  elements.settingsLockBadge.classList.toggle("unlocked", uiState.settingsUnlocked);
+  elements.adminSettingsPanel.hidden = !uiState.settingsUnlocked;
   elements.emailHomeToggle.checked = Boolean(state.emailHomeEnabled);
   elements.apiBaseInput.value = state.apiBase;
   elements.adminKeyInput.value = state.adminKey;
+  elements.adminUnlockInput.value = state.adminKey;
+  elements.queueEmailBtn.disabled = !state.lastStudent;
+  elements.sendEmailBtn.disabled = !state.lastStudent || !state.lastStudent.parent_email;
   renderStudent();
   renderRecentScans();
   renderPendingEmails();
@@ -216,12 +247,10 @@ function renderStudent() {
   elements.studentEmpty.hidden = true;
   elements.studentDetail.hidden = false;
   elements.studentName.textContent = `${state.lastStudent.first_name} ${state.lastStudent.last_name}`;
-  elements.studentCode.textContent = state.lastStudent.student_id || "";
   elements.studentTeam.textContent = state.lastStudent.team || "Unknown";
   elements.studentYear.textContent = state.lastStudent.class_year || "Unknown";
   elements.studentCount.textContent = String(state.lastStudent.total_count || 0);
   elements.studentThreshold.textContent = (state.lastStudent.threshold && state.lastStudent.threshold.title) || "Unknown";
-  elements.studentEmail.textContent = state.lastStudent.parent_email || "Not available";
 }
 
 function renderRecentScans() {
@@ -259,6 +288,50 @@ function renderThresholds() {
       </div>
     `;
   }).join("");
+}
+
+function openSettings() {
+  uiState.settingsOpen = true;
+  elements.settingsModal.hidden = false;
+  document.body.classList.add("settings-open");
+  if (!uiState.settingsUnlocked) {
+    elements.adminUnlockInput.focus();
+  }
+  showSettingsMessage(
+    uiState.settingsUnlocked
+      ? "Admin tools are unlocked on this device."
+      : "Enter the admin key to open connection and admin tools."
+  );
+}
+
+function closeSettings() {
+  uiState.settingsOpen = false;
+  elements.settingsModal.hidden = true;
+  document.body.classList.remove("settings-open");
+}
+
+function handleSettingsUnlock() {
+  const adminKey = elements.adminUnlockInput.value.trim();
+  if (!adminKey) {
+    showSettingsMessage("Enter the admin key first.");
+    return;
+  }
+
+  state.adminKey = adminKey;
+  uiState.settingsUnlocked = true;
+  persist();
+  render();
+  showSettingsMessage("Admin tools unlocked on this device.");
+}
+
+function handleSettingsLock() {
+  uiState.settingsUnlocked = false;
+  render();
+  showSettingsMessage("Settings are locked.");
+}
+
+function showSettingsMessage(message) {
+  elements.settingsMessage.textContent = message;
 }
 
 async function handleScan(event) {
@@ -785,7 +858,7 @@ async function apiFetch(path, options = {}, { admin = false } = {}) {
   }
   if (admin) {
     if (!state.adminKey) {
-      throw new Error("Enter the admin key in the settings card first.");
+      throw new Error("Open Admin settings and enter the admin key first.");
     }
     headers.set("x-admin-key", state.adminKey);
   }
@@ -823,7 +896,7 @@ async function apiFetchAppsScript(path, options = {}, { admin = false } = {}) {
 
   if (admin) {
     if (!state.adminKey) {
-      throw new Error("Enter the admin key in the settings card first.");
+      throw new Error("Open Admin settings and enter the admin key first.");
     }
     payload.adminKey = state.adminKey;
   }
