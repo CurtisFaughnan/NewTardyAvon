@@ -6,6 +6,15 @@ const DEFAULT_APP_THRESHOLDS = [
 ];
 
 const PROFILE_CONFIGS = {
+  "avon-tardies": {
+    profileId: "avon-tardies",
+    defaultSchoolName: "Avon North Middle School",
+    appTitle: "Tardy Tracker",
+    countLabel: "Total tardies",
+    incidentSingular: "tardy",
+    incidentPlural: "tardies",
+    showTeam: true
+  },
   "brownsburg-high-lanyards": {
     profileId: "brownsburg-high-lanyards",
     defaultSchoolName: "Brownsburg High School",
@@ -35,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308k";
+const ASSET_VERSION = "20260308l";
 
 const sampleStudents = {
   "1001": {
