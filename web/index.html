@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lanyard Tracker</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260308e" />
-    <link rel="stylesheet" href="./styles.css?v=20260308e" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260308f" />
+    <link rel="stylesheet" href="./styles.css?v=20260308f" />
   </head>
   <body>
     <div class="page-shell">
@@ -14,8 +14,8 @@
         <div class="brand-inline">
           <img class="brand-mark" src="./assets/Avon_Crest.png" alt="School crest" />
           <div>
-            <p class="eyebrow">Avon North</p>
-            <h1>Lanyard Tracker</h1>
+            <p id="brandEyebrow" class="eyebrow">Avon North</p>
+            <h1 id="brandTitle">Lanyard Tracker</h1>
           </div>
         </div>
         <button id="settingsOpenBtn" class="ghost compact-button" type="button">Admin</button>
@@ -54,11 +54,11 @@
               <span>Class year</span>
               <strong id="studentYear"></strong>
             </div>
-            <div>
+            <div id="studentCountCard">
               <span>Total violations</span>
               <strong id="studentCount"></strong>
             </div>
-            <div class="detail-wide">
+            <div id="studentThresholdCard" class="detail-wide">
               <span>Threshold</span>
               <strong id="studentThreshold"></strong>
             </div>
@@ -177,7 +177,12 @@
                 <p class="eyebrow">Policy</p>
                 <h3>Thresholds</h3>
               </div>
+              <div class="inline-actions">
+                <button id="addThresholdBtn" class="ghost" type="button">Add tier</button>
+                <button id="saveThresholdsBtn" type="button">Save tiers</button>
+              </div>
             </div>
+            <p class="helper">Edit the title, range, and color for each tier. Ranges must be in order and not overlap.</p>
             <div id="thresholdList" class="threshold-list"></div>
           </section>
         </div>
@@ -198,7 +203,7 @@
       </div>
     </div>
 
-    <script src="./vendor/html5-qrcode.min.js?v=20260308e"></script>
-    <script type="module" src="./app.js?v=20260308e"></script>
+    <script src="./vendor/html5-qrcode.min.js?v=20260308f"></script>
+    <script type="module" src="./app.js?v=20260308f"></script>
   </body>
 </html>

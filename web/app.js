@@ -1,6 +1,6 @@
 const STORAGE_KEY = "lanyard-mobile-shell-v2";
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308e";
+const ASSET_VERSION = "20260308f";
 
 const sampleStudents = {
   "1001": {
@@ -30,6 +30,7 @@ const sampleStudents = {
 };
 
 const defaultState = {
+  schoolName: "Avon North",
   apiBase: "",
   adminKey: "",
   backendConnected: false,
@@ -56,6 +57,8 @@ const elements = {
   studentId: document.getElementById("studentId"),
   manualScanBtn: document.getElementById("manualScanBtn"),
   scanMessage: document.getElementById("scanMessage"),
+  brandEyebrow: document.getElementById("brandEyebrow"),
+  brandTitle: document.getElementById("brandTitle"),
   settingsOpenBtn: document.getElementById("settingsOpenBtn"),
   settingsModal: document.getElementById("settingsModal"),
   settingsCloseBtn: document.getElementById("settingsCloseBtn"),
@@ -72,12 +75,16 @@ const elements = {
   recentScans: document.getElementById("recentScans"),
   pendingEmails: document.getElementById("pendingEmails"),
   thresholdList: document.getElementById("thresholdList"),
+  addThresholdBtn: document.getElementById("addThresholdBtn"),
+  saveThresholdsBtn: document.getElementById("saveThresholdsBtn"),
   studentEmpty: document.getElementById("studentEmpty"),
   studentDetail: document.getElementById("studentDetail"),
   studentName: document.getElementById("studentName"),
   studentTeam: document.getElementById("studentTeam"),
   studentYear: document.getElementById("studentYear"),
+  studentCountCard: document.getElementById("studentCountCard"),
   studentCount: document.getElementById("studentCount"),
+  studentThresholdCard: document.getElementById("studentThresholdCard"),
   studentThreshold: document.getElementById("studentThreshold"),
   emailHomeToggle: document.getElementById("emailHomeToggle"),
   apiBaseInput: document.getElementById("apiBaseInput"),
@@ -133,6 +140,10 @@ function wireEvents() {
   elements.queueEmailBtn.addEventListener("click", handleQueueEmail);
   elements.sendEmailBtn.addEventListener("click", handleSendEmail);
   elements.clearPendingBtn.addEventListener("click", handleClearPending);
+  elements.addThresholdBtn.addEventListener("click", handleAddThreshold);
+  elements.saveThresholdsBtn.addEventListener("click", handleSaveThresholds);
+  elements.thresholdList.addEventListener("change", handleThresholdEditorChange);
+  elements.thresholdList.addEventListener("click", handleThresholdListClick);
   elements.cameraScanBtn.addEventListener("click", openScanner);
   elements.scannerCloseBtn.addEventListener("click", () => closeScanner());
   elements.settingsModal.addEventListener("click", (event) => {
@@ -222,8 +233,16 @@ function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function renderBrand() {
+  const schoolName = String(state.schoolName || defaultState.schoolName || "School").trim();
+  elements.brandEyebrow.textContent = schoolName;
+  elements.brandTitle.textContent = "Lanyard Tracker";
+  document.title = `${schoolName} Lanyard Tracker`;
+}
+
 function render() {
   state.scannedKeys = pruneScannedKeys(state.scannedKeys);
+  renderBrand();
   elements.queueCount.textContent = String(state.queue.length);
   elements.sectionCount.textContent = String(state.currentSection || 1);
   elements.resetBadge.textContent = formatResetTime(state.lastResetTime);
@@ -248,6 +267,8 @@ function renderStudent() {
   if (!state.lastStudent) {
     elements.studentEmpty.hidden = false;
     elements.studentDetail.hidden = true;
+    clearTierHighlight(elements.studentCountCard);
+    clearTierHighlight(elements.studentThresholdCard);
     return;
   }
 
@@ -258,6 +279,40 @@ function renderStudent() {
   elements.studentYear.textContent = state.lastStudent.class_year || "Unknown";
   elements.studentCount.textContent = String(state.lastStudent.total_count || 0);
   elements.studentThreshold.textContent = (state.lastStudent.threshold && state.lastStudent.threshold.title) || "Unknown";
+  applyStudentTierHighlight(state.lastStudent.threshold);
+}
+
+function applyStudentTierHighlight(threshold) {
+  if (!threshold || !threshold.hex) {
+    clearTierHighlight(elements.studentCountCard);
+    clearTierHighlight(elements.studentThresholdCard);
+    return;
+  }
+
+  applyTierHighlight(elements.studentCountCard, threshold.hex);
+  applyTierHighlight(elements.studentThresholdCard, threshold.hex);
+}
+
+function applyTierHighlight(card, hex) {
+  const safeHex = normalizeHexColor(hex);
+  const textColor = textColorForHex(safeHex);
+  card.classList.add("tier-highlight");
+  card.style.backgroundColor = safeHex;
+  card.style.color = textColor;
+  card.style.borderColor = "rgba(23, 50, 77, 0.16)";
+  card.querySelectorAll("span, strong").forEach((node) => {
+    node.style.color = textColor;
+  });
+}
+
+function clearTierHighlight(card) {
+  card.classList.remove("tier-highlight");
+  card.style.backgroundColor = "";
+  card.style.color = "";
+  card.style.borderColor = "";
+  card.querySelectorAll("span, strong").forEach((node) => {
+    node.style.color = "";
+  });
 }
 
 function renderRecentScans() {
@@ -283,23 +338,182 @@ function renderPendingEmails() {
 }
 
 function renderThresholds() {
-  elements.thresholdList.innerHTML = state.thresholds.map((threshold) => {
-    const hex = threshold.hex || rgbArrayToHex(threshold.color || [1, 1, 1]);
+  elements.thresholdList.innerHTML = state.thresholds.map((threshold, index) => {
+    const normalized = normalizeThresholdDraft(threshold, index);
+    const hex = normalized.hex;
+    const previewLabel = `${normalized.min} to ${normalized.max} violations`;
     return `
-      <div class="threshold-item">
-        <div>
-          <strong>${escapeHtml(threshold.title)}</strong>
-          <div class="helper">${escapeHtml(String(threshold.min))} to ${escapeHtml(String(threshold.max))} violations</div>
+      <div class="threshold-item" data-index="${index}">
+        <div class="threshold-item-head">
+          <div>
+            <strong>${escapeHtml(normalized.title)}</strong>
+            <div class="helper">${escapeHtml(previewLabel)}</div>
+          </div>
+          <button class="ghost threshold-remove-btn" type="button" data-action="remove-threshold" data-index="${index}" ${state.thresholds.length === 1 ? "disabled" : ""}>Remove</button>
         </div>
-        <span class="threshold-pill" style="background:${hex}">${escapeHtml(threshold.title)}</span>
+        <div class="threshold-item-grid">
+          <label class="stack-field">
+            <span>Title</span>
+            <input type="text" data-field="title" value="${escapeAttribute(normalized.title)}" />
+          </label>
+          <label class="stack-field">
+            <span>Min</span>
+            <input type="number" min="0" step="1" data-field="min" value="${escapeAttribute(String(normalized.min))}" />
+          </label>
+          <label class="stack-field">
+            <span>Max</span>
+            <input type="number" min="0" step="1" data-field="max" value="${escapeAttribute(String(normalized.max))}" />
+          </label>
+          <label class="stack-field">
+            <span>Color</span>
+            <input class="threshold-color-input" type="color" data-field="hex" value="${escapeAttribute(hex)}" />
+          </label>
+        </div>
+        <div class="threshold-item-preview">
+          <small>${escapeHtml(previewLabel)}</small>
+          <span class="threshold-pill" style="background:${hex};color:${textColorForHex(hex)}">${escapeHtml(normalized.title)}</span>
+        </div>
       </div>
     `;
-  }).join("");
+  }).join("") || `<div class="threshold-item"><strong>No tiers yet.</strong><small>Add a tier to start.</small></div>`;
+}
+
+function normalizeThresholdDraft(threshold, index = 0) {
+  const hex = normalizeHexColor(threshold.hex || rgbArrayToHex(threshold.color || [1, 1, 1]));
+  return {
+    title: String(threshold.title || `Tier ${index + 1}`).trim() || `Tier ${index + 1}`,
+    min: Number(threshold.min),
+    max: Number(threshold.max),
+    hex: hex,
+    color: hexToRgbArray(hex)
+  };
+}
+
+function readThresholdsFromEditor() {
+  const rows = Array.from(elements.thresholdList.querySelectorAll(".threshold-item[data-index]"));
+  return rows.map((row, index) => normalizeThresholdDraft({
+    title: row.querySelector('[data-field="title"]').value,
+    min: row.querySelector('[data-field="min"]').value,
+    max: row.querySelector('[data-field="max"]').value,
+    hex: row.querySelector('[data-field="hex"]').value
+  }, index));
+}
+
+function syncThresholdsFromEditor() {
+  if (!elements.thresholdList.querySelector(".threshold-item[data-index]")) {
+    return state.thresholds;
+  }
+
+  state.thresholds = readThresholdsFromEditor();
+  refreshLastStudentThreshold();
+  return state.thresholds;
+}
+
+function refreshLastStudentThreshold() {
+  if (!state.lastStudent || !Number.isFinite(Number(state.lastStudent.total_count))) {
+    return;
+  }
+
+  state.lastStudent.threshold = thresholdFor(Number(state.lastStudent.total_count));
+}
+
+function validateThresholds(thresholds) {
+  if (!thresholds.length) {
+    throw new Error("Add at least one tier.");
+  }
+
+  return thresholds.map((threshold, index) => {
+    const normalized = normalizeThresholdDraft(threshold, index);
+    if (!normalized.title) {
+      throw new Error(`Tier ${index + 1} needs a title.`);
+    }
+    if (!Number.isFinite(normalized.min) || !Number.isFinite(normalized.max)) {
+      throw new Error(`Tier ${index + 1} needs valid min and max values.`);
+    }
+    if (normalized.max < normalized.min) {
+      throw new Error(`Tier ${index + 1} has a max lower than its min.`);
+    }
+    if (index > 0 && normalized.min <= Number(thresholds[index - 1].max)) {
+      throw new Error(`Tier ${index + 1} overlaps the previous tier.`);
+    }
+
+    return {
+      ...normalized,
+      min: Math.trunc(normalized.min),
+      max: Math.trunc(normalized.max)
+    };
+  });
+}
+
+function handleThresholdEditorChange() {
+  syncThresholdsFromEditor();
+  persist();
+  render();
+}
+
+function handleThresholdListClick(event) {
+  const removeButton = event.target.closest('[data-action="remove-threshold"]');
+  if (!removeButton) {
+    return;
+  }
+
+  syncThresholdsFromEditor();
+  const index = Number(removeButton.dataset.index);
+  if (!Number.isFinite(index) || state.thresholds.length <= 1) {
+    return;
+  }
+
+  state.thresholds.splice(index, 1);
+  refreshLastStudentThreshold();
+  persist();
+  render();
+}
+
+function handleAddThreshold() {
+  syncThresholdsFromEditor();
+  const lastThreshold = state.thresholds[state.thresholds.length - 1];
+  const nextMin = Number.isFinite(Number(lastThreshold && lastThreshold.max)) ? Number(lastThreshold.max) + 1 : 1;
+  state.thresholds.push(normalizeThresholdDraft({
+    title: `Tier ${state.thresholds.length + 1}`,
+    min: nextMin,
+    max: nextMin + 4,
+    hex: "#8c9aa8"
+  }, state.thresholds.length));
+  persist();
+  render();
+}
+
+async function handleSaveThresholds() {
+  try {
+    const nextThresholds = validateThresholds(syncThresholdsFromEditor());
+    if (!state.apiBase) {
+      state.thresholds = normalizeThresholds(nextThresholds);
+      refreshLastStudentThreshold();
+      persist();
+      render();
+      showSettingsMessage("Thresholds saved in this browser.");
+      return;
+    }
+
+    const savedThresholds = await apiFetch("/api/thresholds", {
+      method: "POST",
+      body: JSON.stringify({ thresholds: nextThresholds })
+    }, { admin: true });
+    state.thresholds = normalizeThresholds(savedThresholds);
+    refreshLastStudentThreshold();
+    persist();
+    render();
+    showSettingsMessage("Thresholds saved.");
+  } catch (error) {
+    showSettingsMessage(error.message);
+  }
 }
 
 function normalizeStoredState(nextState) {
   return {
     ...nextState,
+    schoolName: String(nextState.schoolName || defaultState.schoolName),
+    thresholds: normalizeThresholds(nextState.thresholds || defaultState.thresholds),
     scannedKeys: pruneScannedKeys(nextState.scannedKeys)
   };
 }
@@ -614,8 +828,10 @@ async function bootstrapFromApi() {
   try {
     const payload = await apiFetch("/api/bootstrap");
     state.backendConnected = true;
+    state.schoolName = String(payload.schoolName || state.schoolName || defaultState.schoolName);
     state.thresholds = normalizeThresholds(payload.thresholds || defaultState.thresholds);
     applySettings(payload.settings || {});
+    refreshLastStudentThreshold();
     state.pendingEmails = payload.pendingEmails || [];
     persist();
     render();
@@ -747,17 +963,12 @@ function applySettings(settings) {
 }
 
 function thresholdFor(totalCount) {
-  return state.thresholds.find((threshold) => totalCount >= threshold.min && totalCount <= threshold.max) || state.thresholds[state.thresholds.length - 1];
+  const thresholds = state.thresholds.length ? state.thresholds : normalizeThresholds(defaultState.thresholds);
+  return thresholds.find((threshold) => totalCount >= threshold.min && totalCount <= threshold.max) || thresholds[thresholds.length - 1];
 }
 
 function normalizeThresholds(thresholds) {
-  return thresholds.map((threshold) => ({
-    ...threshold,
-    min: Number(threshold.min),
-    max: Number(threshold.max),
-    color: threshold.color || hexToRgbArray(threshold.hex || "#ffffff"),
-    hex: threshold.hex || rgbArrayToHex(threshold.color || [1, 1, 1])
-  }));
+  return thresholds.map((threshold, index) => normalizeThresholdDraft(threshold, index));
 }
 
 async function openScanner() {
@@ -1059,8 +1270,25 @@ function rgbArrayToHex(color) {
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
+function normalizeHexColor(hex) {
+  const clean = String(hex || "").trim().replace("#", "");
+  if (/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return `#${clean.toLowerCase()}`;
+  }
+  return "#ffffff";
+}
+
+function textColorForHex(hex) {
+  const clean = normalizeHexColor(hex).replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.62 ? "#17324d" : "#fffaf1";
+}
+
 function hexToRgbArray(hex) {
-  const clean = String(hex || "").replace("#", "");
+  const clean = normalizeHexColor(hex).replace("#", "");
   if (clean.length !== 6) {
     return [1, 1, 1];
   }
@@ -1097,6 +1325,10 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
 function showMessage(message) {

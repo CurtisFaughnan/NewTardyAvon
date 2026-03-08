@@ -57,13 +57,14 @@ function parseRequest_(e, method) {
 function routeRequest_(request) {
   switch (request.endpoint) {
     case 'health':
-      return { ok: true, settings: getSettings_(), mode: 'apps-script' };
+      return { ok: true, settings: getSettings_(), mode: 'apps-script', schoolName: getSchoolName_() };
     case 'bootstrap':
       return {
         thresholds: getThresholds_(),
         settings: getSettings_(),
         pendingEmails: getPendingEmails_(),
         mode: 'apps-script',
+        schoolName: getSchoolName_(),
         remainingDailyEmailQuota: MailApp.getRemainingDailyQuota()
       };
     case 'students':
@@ -96,7 +97,12 @@ function routeRequest_(request) {
       assertAdmin_(request);
       return startNewSection_();
     case 'thresholds':
-      return getThresholds_();
+      if (request.method === 'GET') {
+        return getThresholds_();
+      }
+      assertMethod_(request, 'POST');
+      assertAdmin_(request);
+      return saveThresholds_(request.params.thresholds || []);
     default:
       throw new Error('Unknown endpoint: ' + request.endpoint);
   }
@@ -276,6 +282,51 @@ function getThresholds_() {
       title: String(row.title || 'Tier')
     });
   });
+}
+
+function saveThresholds_(thresholds) {
+  if (!Array.isArray(thresholds) || thresholds.length === 0) {
+    throw new Error('At least one threshold is required.');
+  }
+
+  var normalized = thresholds.map(function(threshold, index) {
+    var title = String(threshold.title || '').trim();
+    var min = Number(threshold.min);
+    var max = Number(threshold.max);
+    var hex = String(threshold.hex || '').trim();
+    if (!title) {
+      throw new Error('Tier ' + (index + 1) + ' needs a title.');
+    }
+    if (!isFinite(min) || !isFinite(max)) {
+      throw new Error('Tier ' + (index + 1) + ' needs valid min and max values.');
+    }
+    if (max < min) {
+      throw new Error('Tier ' + (index + 1) + ' has a max lower than its min.');
+    }
+    if (!/^#?[0-9a-fA-F]{6}$/.test(hex)) {
+      throw new Error('Tier ' + (index + 1) + ' needs a valid 6-digit color.');
+    }
+
+    return {
+      title: title,
+      min: Math.trunc(min),
+      max: Math.trunc(max),
+      hex: hex.charAt(0) === '#' ? hex.toLowerCase() : ('#' + hex.toLowerCase())
+    };
+  });
+
+  normalized.forEach(function(threshold, index) {
+    if (index > 0 && threshold.min <= normalized[index - 1].max) {
+      throw new Error('Tier ' + (index + 1) + ' overlaps the previous tier.');
+    }
+  });
+
+  overwriteSheet_(SHEETS.thresholds, thresholdHeaders_(), normalized.map(function(threshold) {
+    var color = hexToRgb_(threshold.hex);
+    return [threshold.min, threshold.max, color[0], color[1], color[2], threshold.title];
+  }));
+
+  return getThresholds_();
 }
 
 function decorateThreshold_(threshold) {
@@ -615,6 +666,17 @@ function rgbToHex_(color) {
   return '#' + color.map(function(part) {
     return Math.max(0, Math.min(255, Math.round(Number(part) * 255))).toString(16).padStart(2, '0');
   }).join('');
+}
+
+function hexToRgb_(hex) {
+  var clean = String(hex || '').replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return [1, 1, 1];
+  }
+
+  return [0, 2, 4].map(function(index) {
+    return parseInt(clean.slice(index, index + 2), 16) / 255;
+  });
 }
 
 function todayKey_() {

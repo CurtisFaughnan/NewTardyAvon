@@ -249,10 +249,15 @@ h3 {
 
 .student-detail div {
   padding: 1rem;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .detail-wide {
   grid-column: 1 / -1;
+}
+
+.student-detail div.tier-highlight {
+  border-color: rgba(23, 50, 77, 0.16);
 }
 
 .student-detail span,
@@ -388,10 +393,45 @@ h3 {
 }
 
 .threshold-item {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.threshold-item-head,
+.threshold-item-actions,
+.threshold-item-preview {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+}
+
+.threshold-item-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.threshold-item .stack-field {
+  gap: 0.4rem;
+}
+
+.threshold-item .stack-field span {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+
+.threshold-item input {
+  background: #fff;
+}
+
+.threshold-color-input {
+  min-height: 3rem;
+  padding: 0.35rem;
+}
+
+.threshold-remove-btn {
+  white-space: nowrap;
 }
 
 .threshold-pill {
@@ -439,13 +479,16 @@ body.scanner-open {
   .toggle-row,
   .card-head,
   .section-head,
-  .threshold-item {
+  .threshold-item-head,
+  .threshold-item-actions,
+  .threshold-item-preview {
     flex-direction: column;
     align-items: stretch;
   }
 
   .student-detail,
-  .summary-grid {
+  .summary-grid,
+  .threshold-item-grid {
     grid-template-columns: 1fr;
   }
 
