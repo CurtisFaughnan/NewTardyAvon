@@ -35,8 +35,8 @@ function doPost(e) {
 
 function handleRequest_(e, method) {
   try {
-    maintainScanSheet_();
     const request = parseRequest_(e, method);
+    maintainScanSheet_(request);
     const data = routeRequest_(request);
     return jsonResponse_(data);
   } catch (error) {
@@ -360,6 +360,7 @@ function saveThresholds_(thresholds) {
     return [threshold.min, threshold.max, color[0], color[1], color[2], threshold.title];
   }));
 
+  refreshDailyHighlights_();
   return getThresholds_();
 }
 
@@ -465,15 +466,15 @@ function getScanRows_() {
   return getRecords_(SHEETS.scans, scanHeaders_());
 }
 
-function maintainScanSheet_() {
+function maintainScanSheet_(request) {
   const properties = PropertiesService.getScriptProperties();
   const today = todayKey_();
   const lastReset = properties.getProperty('LAST_DAILY_HIGHLIGHT_RESET') || '';
-  if (lastReset === today) {
+  if (lastReset === today && !shouldRefreshDailyHighlights_(request)) {
     return;
   }
 
-  clearDailyHighlights_();
+  refreshDailyHighlights_();
   properties.setProperty('LAST_DAILY_HIGHLIGHT_RESET', today);
 }
 
@@ -484,7 +485,59 @@ function clearDailyHighlights_() {
     return;
   }
 
-  sheet.getRange(2, 1, lastRow - 1, 8).setBackground('#ffffff');
+  sheet.getRange(2, 1, lastRow - 1, Math.max(sheet.getLastColumn(), scanHeaders_().length)).setBackground('#ffffff');
+}
+
+function shouldRefreshDailyHighlights_(request) {
+  if (!request || !request.endpoint) {
+    return true;
+  }
+
+  return request.endpoint === 'bootstrap'
+    || request.endpoint === 'health'
+    || request.endpoint === 'thresholds';
+}
+
+function refreshDailyHighlights_() {
+  const sheet = getOrCreateSheet_(SHEETS.scans, scanHeaders_());
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return;
+  }
+
+  const columnCount = Math.max(sheet.getLastColumn(), scanHeaders_().length);
+  const headers = sheet.getRange(1, 1, 1, columnCount).getValues()[0].map(function(header) {
+    return String(header || '').trim();
+  });
+  const values = sheet.getRange(2, 1, lastRow - 1, columnCount).getValues();
+  const thresholds = getThresholds_();
+  const today = todayKey_();
+  const white = '#ffffff';
+  const backgrounds = values.map(function(row) {
+    const record = {};
+    headers.forEach(function(header, index) {
+      record[header] = row[index];
+    });
+
+    const totalCount = Number(record.scan_number || 0);
+    const isToday = readScanDate_(record) === today;
+    const hex = isToday && totalCount > 0
+      ? ((thresholdForCount_(thresholds, totalCount).hex) || white)
+      : white;
+
+    return Array(columnCount).fill(hex);
+  });
+
+  sheet.getRange(2, 1, values.length, columnCount).setBackgrounds(backgrounds);
+}
+
+function runDailyHighlightReset() {
+  refreshDailyHighlights_();
+  PropertiesService.getScriptProperties().setProperty('LAST_DAILY_HIGHLIGHT_RESET', todayKey_());
+}
+
+function repairTodayHighlights() {
+  refreshDailyHighlights_();
 }
 
 function recordScan_(params) {
@@ -618,7 +671,7 @@ function thresholdForCount_(thresholds, totalCount) {
 
 function colorScanRow_(sheet, rowIndex, threshold) {
   const hex = threshold.hex || rgbToHex_(threshold.color || [1, 1, 1]);
-  sheet.getRange(rowIndex, 1, 1, 8).setBackground(hex);
+  sheet.getRange(rowIndex, 1, 1, Math.max(sheet.getLastColumn(), scanHeaders_().length)).setBackground(hex);
 }
 
 function startNewSection_() {
