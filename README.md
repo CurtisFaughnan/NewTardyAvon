@@ -1,9 +1,11 @@
-# Lanyard Tracker
+# NewTardyAvon
+
+Lanyard Tracker rewritten for phone access with a GitHub Pages frontend and a private backend.
 
 This repo now has two tracks:
 - `Lanyard/`: the extracted legacy desktop app source.
 - `web/`: the phone-friendly PWA shell for GitHub Pages.
-- `backend/`: the private API that talks to Google Sheets and sends email.
+- `backend/`: the private API that talks to Google Sheets and email.
 
 Important:
 - The original Windows `.exe` cannot run on phones as-is.
