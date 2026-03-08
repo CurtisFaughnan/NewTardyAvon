@@ -5,13 +5,21 @@ const DEFAULT_APP_TITLE = 'Lanyard Tracker';
 const DEFAULT_COUNT_LABEL = 'Total violations';
 const DEFAULT_INCIDENT_SINGULAR = 'violation';
 const DEFAULT_INCIDENT_PLURAL = 'violations';
-const SHEETS = {
+const SHEET_DEFAULTS = {
   students: 'Lanyard_Data',
   scans: 'lanyard_log',
   thresholds: 'Thresholds',
   pendingEmails: 'Pending_Emails',
   sentEmails: 'Sent_Emails',
   settings: 'App_Settings'
+};
+const SHEET_PROPERTY_KEYS = {
+  students: 'STUDENTS_SHEET_NAME',
+  scans: 'SCANS_SHEET_NAME',
+  thresholds: 'THRESHOLDS_SHEET_NAME',
+  pendingEmails: 'PENDING_EMAILS_SHEET_NAME',
+  sentEmails: 'SENT_EMAILS_SHEET_NAME',
+  settings: 'SETTINGS_SHEET_NAME'
 };
 const DEFAULT_THRESHOLDS = [
   { min: 1, max: 4, color: [0.0, 1.0, 0.0], title: 'Tier 1' },
@@ -88,7 +96,7 @@ function routeRequest_(request) {
     case 'pending-emails/clear':
       assertMethod_(request, 'POST');
       assertAdmin_(request);
-      clearSheetData_(SHEETS.pendingEmails, pendingHeaders_());
+      clearSheetData_(getSheetName_('pendingEmails'), pendingHeaders_());
       return { ok: true };
     case 'send-email':
       assertMethod_(request, 'POST');
@@ -186,6 +194,15 @@ function getProgramLabel_() {
   return label || 'Student Tracker';
 }
 
+function getSheetName_(key) {
+  const propertyKey = SHEET_PROPERTY_KEYS[key];
+  if (!propertyKey) {
+    throw new Error('Unknown sheet key: ' + key);
+  }
+
+  return PropertiesService.getScriptProperties().getProperty(propertyKey) || SHEET_DEFAULTS[key];
+}
+
 function getOrCreateSheet_(name, headers) {
   const spreadsheet = getSpreadsheet_();
   let sheet = spreadsheet.getSheetByName(name);
@@ -195,7 +212,7 @@ function getOrCreateSheet_(name, headers) {
 
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-  } else if (name !== SHEETS.students) {
+  } else if (name !== getSheetName_('students')) {
     ensureHeaders_(sheet, headers);
   }
 
@@ -284,7 +301,7 @@ function settingsHeaders_() {
 }
 
 function getStudents_() {
-  return getRecords_(SHEETS.students, studentHeaders_());
+  return getRecords_(getSheetName_('students'), studentHeaders_());
 }
 
 function getSheetHeaders_(sheet, fallbackHeaders) {
@@ -303,7 +320,7 @@ function getSheetHeaders_(sheet, fallbackHeaders) {
 }
 
 function getStudentSheetHeaders_() {
-  const sheet = getOrCreateSheet_(SHEETS.students, studentHeaders_());
+  const sheet = getOrCreateSheet_(getSheetName_('students'), studentHeaders_());
   return getSheetHeaders_(sheet, studentHeaders_());
 }
 
@@ -401,7 +418,7 @@ function addStudent_(student) {
     throw new Error('Students sheet is missing required columns: ' + missingHeaders.join(', '));
   }
 
-  appendRow_(SHEETS.students, headers, headers.map(function(header) {
+  appendRow_(getSheetName_('students'), headers, headers.map(function(header) {
     return studentValueForHeader_(sanitized, header);
   }));
 
@@ -409,9 +426,9 @@ function addStudent_(student) {
 }
 
 function getThresholds_() {
-  const rows = getRecords_(SHEETS.thresholds, thresholdHeaders_());
+  const rows = getRecords_(getSheetName_('thresholds'), thresholdHeaders_());
   if (rows.length === 0) {
-    overwriteSheet_(SHEETS.thresholds, thresholdHeaders_(), DEFAULT_THRESHOLDS.map(function(threshold) {
+    overwriteSheet_(getSheetName_('thresholds'), thresholdHeaders_(), DEFAULT_THRESHOLDS.map(function(threshold) {
       return [threshold.min, threshold.max, threshold.color[0], threshold.color[1], threshold.color[2], threshold.title];
     }));
     return DEFAULT_THRESHOLDS.map(decorateThreshold_);
@@ -464,7 +481,7 @@ function saveThresholds_(thresholds) {
     }
   });
 
-  overwriteSheet_(SHEETS.thresholds, thresholdHeaders_(), normalized.map(function(threshold) {
+  overwriteSheet_(getSheetName_('thresholds'), thresholdHeaders_(), normalized.map(function(threshold) {
     var color = hexToRgb_(threshold.hex);
     return [threshold.min, threshold.max, color[0], color[1], color[2], threshold.title];
   }));
@@ -485,9 +502,9 @@ function decorateThreshold_(threshold) {
 }
 
 function getSettings_() {
-  const rows = getRecords_(SHEETS.settings, settingsHeaders_());
+  const rows = getRecords_(getSheetName_('settings'), settingsHeaders_());
   if (rows.length === 0) {
-    overwriteSheet_(SHEETS.settings, settingsHeaders_(), Object.keys(DEFAULT_SETTINGS).map(function(key) {
+    overwriteSheet_(getSheetName_('settings'), settingsHeaders_(), Object.keys(DEFAULT_SETTINGS).map(function(key) {
       return [key, JSON.stringify(DEFAULT_SETTINGS[key])];
     }));
     return Object.assign({}, DEFAULT_SETTINGS);
@@ -501,14 +518,14 @@ function getSettings_() {
 
 function saveSettings_(patch) {
   const nextSettings = Object.assign({}, getSettings_(), patch);
-  overwriteSheet_(SHEETS.settings, settingsHeaders_(), Object.keys(nextSettings).map(function(key) {
+  overwriteSheet_(getSheetName_('settings'), settingsHeaders_(), Object.keys(nextSettings).map(function(key) {
     return [key, JSON.stringify(nextSettings[key])];
   }));
   return nextSettings;
 }
 
 function getPendingEmails_() {
-  return getRecords_(SHEETS.pendingEmails, pendingHeaders_()).sort(function(left, right) {
+  return getRecords_(getSheetName_('pendingEmails'), pendingHeaders_()).sort(function(left, right) {
     return String(right.timestamp || '').localeCompare(String(left.timestamp || ''));
   }).map(function(record) {
     return {
@@ -547,7 +564,7 @@ function upsertPendingEmail_(record) {
     return normalizeStudentId_(item.student_id) !== normalizeStudentId_(record.student_id);
   });
   rows.unshift(record);
-  overwriteSheet_(SHEETS.pendingEmails, pendingHeaders_(), rows.map(function(item) {
+  overwriteSheet_(getSheetName_('pendingEmails'), pendingHeaders_(), rows.map(function(item) {
     return [item.timestamp, item.student_id, item.name, item.parent_email, item.total_count, item.tier, item.reason, item.status];
   }));
 }
@@ -556,23 +573,23 @@ function removePendingEmail_(studentId) {
   const rows = getPendingEmails_().filter(function(item) {
     return normalizeStudentId_(item.student_id) !== normalizeStudentId_(studentId);
   });
-  overwriteSheet_(SHEETS.pendingEmails, pendingHeaders_(), rows.map(function(item) {
+  overwriteSheet_(getSheetName_('pendingEmails'), pendingHeaders_(), rows.map(function(item) {
     return [item.timestamp, item.student_id, item.name, item.parent_email, item.total_count, item.tier, item.reason, item.status];
   }));
 }
 
 function getSentEmails_() {
-  return getRecords_(SHEETS.sentEmails, sentHeaders_()).sort(function(left, right) {
+  return getRecords_(getSheetName_('sentEmails'), sentHeaders_()).sort(function(left, right) {
     return String(right.timestamp || '').localeCompare(String(left.timestamp || ''));
   });
 }
 
 function appendSentEmail_(record) {
-  appendRow_(SHEETS.sentEmails, sentHeaders_(), [record.timestamp, record.student_id, record.name, record.parent_email, record.total_count, record.tier, record.subject, record.status]);
+  appendRow_(getSheetName_('sentEmails'), sentHeaders_(), [record.timestamp, record.student_id, record.name, record.parent_email, record.total_count, record.tier, record.subject, record.status]);
 }
 
 function getScanRows_() {
-  return getRecords_(SHEETS.scans, scanHeaders_());
+  return getRecords_(getSheetName_('scans'), scanHeaders_());
 }
 
 function maintainScanSheet_(request) {
@@ -588,7 +605,7 @@ function maintainScanSheet_(request) {
 }
 
 function clearDailyHighlights_() {
-  const sheet = getOrCreateSheet_(SHEETS.scans, scanHeaders_());
+  const sheet = getOrCreateSheet_(getSheetName_('scans'), scanHeaders_());
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) {
     return;
@@ -608,7 +625,7 @@ function shouldRefreshDailyHighlights_(request) {
 }
 
 function refreshDailyHighlights_() {
-  const sheet = getOrCreateSheet_(SHEETS.scans, scanHeaders_());
+  const sheet = getOrCreateSheet_(getSheetName_('scans'), scanHeaders_());
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) {
     return;
@@ -723,7 +740,7 @@ function recordScan_(params) {
   }
 
   const timestamp = new Date().toISOString();
-  const appended = appendRow_(SHEETS.scans, scanHeaders_(), [
+  const appended = appendRow_(getSheetName_('scans'), scanHeaders_(), [
     timestamp,
     student.student_id,
     student.first_name + ' ' + student.last_name,
