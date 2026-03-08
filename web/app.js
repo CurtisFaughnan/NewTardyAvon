@@ -13,6 +13,7 @@ const PROFILE_CONFIGS = {
     countLabel: "Total lanyard violations",
     incidentSingular: "lanyard violation",
     incidentPlural: "lanyard violations",
+    showTeam: false,
     defaultThresholds: [
       { min: 1, max: 4, title: "Tier 1", color: [0.7, 1, 0.7] },
       { min: 5, max: 9, title: "Tier 2", color: [1, 1, 0.6] },
@@ -26,14 +27,15 @@ const PROFILE_CONFIGS = {
     appTitle: "Tardy Tracker",
     countLabel: "Total tardies",
     incidentSingular: "tardy",
-    incidentPlural: "tardies"
+    incidentPlural: "tardies",
+    showTeam: false
   }
 };
 
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308i";
+const ASSET_VERSION = "20260308j";
 
 const sampleStudents = {
   "1001": {
@@ -112,6 +114,7 @@ const elements = {
   studentEmpty: document.getElementById("studentEmpty"),
   studentDetail: document.getElementById("studentDetail"),
   studentName: document.getElementById("studentName"),
+  studentTeamCard: document.getElementById("studentTeamCard"),
   studentTeam: document.getElementById("studentTeam"),
   studentYear: document.getElementById("studentYear"),
   studentCountLabel: document.getElementById("studentCountLabel"),
@@ -303,6 +306,9 @@ function renderStudent() {
   if (!state.lastStudent) {
     elements.studentEmpty.hidden = false;
     elements.studentDetail.hidden = true;
+    if (elements.studentTeamCard) {
+      elements.studentTeamCard.hidden = false;
+    }
     clearTierHighlight(elements.studentCountCard);
     clearTierHighlight(elements.studentThresholdCard);
     return;
@@ -311,11 +317,21 @@ function renderStudent() {
   elements.studentEmpty.hidden = true;
   elements.studentDetail.hidden = false;
   elements.studentName.textContent = `${state.lastStudent.first_name} ${state.lastStudent.last_name}`;
-  elements.studentTeam.textContent = state.lastStudent.team || "Unknown";
+  if (elements.studentTeamCard) {
+    elements.studentTeamCard.hidden = !shouldShowTeamField(state.lastStudent);
+  }
+  elements.studentTeam.textContent = state.lastStudent.team || "";
   elements.studentYear.textContent = state.lastStudent.class_year || "Unknown";
   elements.studentCount.textContent = String(state.lastStudent.total_count || 0);
   elements.studentThreshold.textContent = (state.lastStudent.threshold && state.lastStudent.threshold.title) || "Unknown";
   applyStudentTierHighlight(state.lastStudent.threshold);
+}
+
+function shouldShowTeamField(student) {
+  if (RUNTIME_CONFIG.showTeam === false) {
+    return false;
+  }
+  return Boolean(student && String(student.team || "").trim());
 }
 
 function applyStudentTierHighlight(threshold) {
@@ -1320,6 +1336,7 @@ function resolveRuntimeConfig() {
       countLabel: "Total violations",
       incidentSingular: "violation",
       incidentPlural: "violations",
+      showTeam: true,
       defaultThresholds: clone(DEFAULT_APP_THRESHOLDS)
     };
   }
@@ -1336,6 +1353,9 @@ function resolveRuntimeConfig() {
     countLabel: String(inlineConfig.countLabel || profileConfig.countLabel || "Total violations"),
     incidentSingular: String(inlineConfig.incidentSingular || profileConfig.incidentSingular || "violation"),
     incidentPlural: String(inlineConfig.incidentPlural || profileConfig.incidentPlural || "violations"),
+    showTeam: typeof inlineConfig.showTeam === "boolean"
+      ? inlineConfig.showTeam
+      : (typeof profileConfig.showTeam === "boolean" ? profileConfig.showTeam : true),
     defaultEmailHomeEnabled: typeof inlineConfig.defaultEmailHomeEnabled === "boolean"
       ? inlineConfig.defaultEmailHomeEnabled
       : (typeof profileConfig.defaultEmailHomeEnabled === "boolean" ? profileConfig.defaultEmailHomeEnabled : true),
