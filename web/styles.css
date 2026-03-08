@@ -408,7 +408,7 @@ body.scanner-open {
 }
 
 .scanner-mount {
-  min-height: 320px;
+  min-height: 380px;
   overflow: hidden;
   border-radius: 22px;
   background: #091623;
@@ -416,8 +416,9 @@ body.scanner-open {
 
 .scanner-mount video {
   width: 100%;
-  height: auto;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain;
+  background: #091623;
 }
 
 .scanner-status {
@@ -467,6 +468,6 @@ body.scanner-open {
   }
 
   .scanner-mount {
-    min-height: 260px;
+    min-height: 320px;
   }
 }

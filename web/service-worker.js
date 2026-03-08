@@ -1,12 +1,12 @@
-const CACHE_NAME = "lanyard-shell-v7";
+const CACHE_NAME = "lanyard-shell-v8";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=20260308d",
-  "./app.js?v=20260308d",
-  "./manifest.webmanifest?v=20260308d",
+  "./styles.css?v=20260308e",
+  "./app.js?v=20260308e",
+  "./manifest.webmanifest?v=20260308e",
   "./assets/Avon_Crest.png",
-  "./vendor/html5-qrcode.min.js?v=20260308d"
+  "./vendor/html5-qrcode.min.js?v=20260308e"
 ];
 
 self.addEventListener("install", (event) => {

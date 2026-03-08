@@ -1,6 +1,6 @@
 const STORAGE_KEY = "lanyard-mobile-shell-v2";
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308d";
+const ASSET_VERSION = "20260308e";
 
 const sampleStudents = {
   "1001": {
@@ -791,14 +791,15 @@ async function openScanner() {
 
 async function startScannerInstance(instance) {
   const config = {
-    fps: 10,
+    fps: 12,
     qrbox: (viewfinderWidth, viewfinderHeight) => {
-      const width = Math.min(Math.floor(viewfinderWidth * 0.88), 360);
+      const width = Math.min(Math.floor(viewfinderWidth * 0.96), 560);
       return {
         width,
-        height: Math.max(120, Math.floor(width * 0.45))
+        height: Math.min(Math.floor(viewfinderHeight * 0.82), Math.max(190, Math.floor(width * 0.68)))
       };
     },
+    aspectRatio: 1.333334,
     rememberLastUsedCamera: true,
     formatsToSupport: getScannerFormats()
   };
@@ -823,7 +824,13 @@ async function startScannerInstance(instance) {
     scannerState.resolving = false;
   };
 
-  const onFailure = () => {};
+  let failedFrames = 0;
+  const onFailure = () => {
+    failedFrames += 1;
+    if (failedFrames === 40) {
+      updateScannerStatus("Hold the barcode flat, fill most of the box, and move a little closer.");
+    }
+  };
 
   try {
     await instance.start({ facingMode: "environment" }, config, onSuccess, onFailure);
