@@ -1,6 +1,26 @@
-const STORAGE_KEY = "lanyard-mobile-shell-v2";
+const PROFILE_CONFIGS = {
+  "brownsburg-high-lanyards": {
+    profileId: "brownsburg-high-lanyards",
+    defaultSchoolName: "Brownsburg High School",
+    appTitle: "Lanyard Tracker",
+    countLabel: "Total lanyard violations",
+    incidentSingular: "lanyard violation",
+    incidentPlural: "lanyard violations"
+  },
+  "brownsburg-high-tardies": {
+    profileId: "brownsburg-high-tardies",
+    defaultSchoolName: "Brownsburg High School",
+    appTitle: "Tardy Tracker",
+    countLabel: "Total tardies",
+    incidentSingular: "tardy",
+    incidentPlural: "tardies"
+  }
+};
+
+const RUNTIME_CONFIG = resolveRuntimeConfig();
+const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308f";
+const ASSET_VERSION = "20260308h";
 
 const sampleStudents = {
   "1001": {
@@ -30,7 +50,11 @@ const sampleStudents = {
 };
 
 const defaultState = {
-  schoolName: "Avon North",
+  schoolName: RUNTIME_CONFIG.defaultSchoolName,
+  appTitle: RUNTIME_CONFIG.appTitle,
+  countLabel: RUNTIME_CONFIG.countLabel,
+  incidentSingular: RUNTIME_CONFIG.incidentSingular,
+  incidentPlural: RUNTIME_CONFIG.incidentPlural,
   apiBase: "",
   adminKey: "",
   backendConnected: false,
@@ -82,6 +106,7 @@ const elements = {
   studentName: document.getElementById("studentName"),
   studentTeam: document.getElementById("studentTeam"),
   studentYear: document.getElementById("studentYear"),
+  studentCountLabel: document.getElementById("studentCountLabel"),
   studentCountCard: document.getElementById("studentCountCard"),
   studentCount: document.getElementById("studentCount"),
   studentThresholdCard: document.getElementById("studentThresholdCard"),
@@ -235,9 +260,12 @@ function persist() {
 
 function renderBrand() {
   const schoolName = String(state.schoolName || defaultState.schoolName || "School").trim();
+  const appTitle = String(state.appTitle || defaultState.appTitle || "Lanyard Tracker").trim();
+  const countLabel = String(state.countLabel || defaultState.countLabel || "Total violations").trim();
   elements.brandEyebrow.textContent = schoolName;
-  elements.brandTitle.textContent = "Lanyard Tracker";
-  document.title = `${schoolName} Lanyard Tracker`;
+  elements.brandTitle.textContent = appTitle;
+  elements.studentCountLabel.textContent = countLabel;
+  document.title = `${schoolName} ${appTitle}`;
 }
 
 function render() {
@@ -316,11 +344,12 @@ function clearTierHighlight(card) {
 }
 
 function renderRecentScans() {
+  const countLabel = String(state.countLabel || defaultState.countLabel || "Total violations").trim();
   const items = state.recentScans.map((scan) => `
     <li>
       <strong>${escapeHtml(scan.name)}</strong>
       <small>${escapeHtml(scan.student_id)} | ${escapeHtml(scan.team || "No team")}</small>
-      <small>Count ${escapeHtml(String(scan.total_count || 0))} | Section ${escapeHtml(String(scan.section || 1))} | ${escapeHtml(scan.synced ? "Synced" : "Queued")}</small>
+      <small>${escapeHtml(countLabel)} ${escapeHtml(String(scan.total_count || 0))} | Section ${escapeHtml(String(scan.section || 1))} | ${escapeHtml(scan.synced ? "Synced" : "Queued")}</small>
     </li>
   `).join("");
   elements.recentScans.innerHTML = items || `<li><strong>No scans yet.</strong><small>Use the scan box above to start.</small></li>`;
@@ -341,7 +370,8 @@ function renderThresholds() {
   elements.thresholdList.innerHTML = state.thresholds.map((threshold, index) => {
     const normalized = normalizeThresholdDraft(threshold, index);
     const hex = normalized.hex;
-    const previewLabel = `${normalized.min} to ${normalized.max} violations`;
+    const incidentPlural = String(state.incidentPlural || defaultState.incidentPlural || "violations");
+    const previewLabel = `${normalized.min} to ${normalized.max} ${incidentPlural}`;
     return `
       <div class="threshold-item" data-index="${index}">
         <div class="threshold-item-head">
@@ -513,6 +543,10 @@ function normalizeStoredState(nextState) {
   return {
     ...nextState,
     schoolName: String(nextState.schoolName || defaultState.schoolName),
+    appTitle: String(nextState.appTitle || defaultState.appTitle),
+    countLabel: String(nextState.countLabel || defaultState.countLabel),
+    incidentSingular: String(nextState.incidentSingular || defaultState.incidentSingular),
+    incidentPlural: String(nextState.incidentPlural || defaultState.incidentPlural),
     thresholds: normalizeThresholds(nextState.thresholds || defaultState.thresholds),
     scannedKeys: pruneScannedKeys(nextState.scannedKeys)
   };
@@ -703,7 +737,7 @@ function handleMockScan(studentId) {
   });
 
   if (state.emailHomeEnabled && threshold.title.toLowerCase() === "email home") {
-    upsertPendingEmailLocal(state.lastStudent, `${threshold.title} reached at ${totalCount} violations.`);
+    upsertPendingEmailLocal(state.lastStudent, `${threshold.title} reached at ${totalCount} ${state.incidentPlural || defaultState.incidentPlural}.`);
   }
 
   persist();
@@ -828,7 +862,7 @@ async function bootstrapFromApi() {
   try {
     const payload = await apiFetch("/api/bootstrap");
     state.backendConnected = true;
-    state.schoolName = String(payload.schoolName || state.schoolName || defaultState.schoolName);
+    applyClientConfig(payload);
     state.thresholds = normalizeThresholds(payload.thresholds || defaultState.thresholds);
     applySettings(payload.settings || {});
     refreshLastStudentThreshold();
@@ -960,6 +994,14 @@ function applySettings(settings) {
   if (typeof settings.last_reset_time !== "undefined") {
     state.lastResetTime = settings.last_reset_time || "Never";
   }
+}
+
+function applyClientConfig(config = {}) {
+  state.schoolName = String(config.schoolName || state.schoolName || defaultState.schoolName);
+  state.appTitle = String(config.appTitle || state.appTitle || defaultState.appTitle);
+  state.countLabel = String(config.countLabel || state.countLabel || defaultState.countLabel);
+  state.incidentSingular = String(config.incidentSingular || state.incidentSingular || defaultState.incidentSingular);
+  state.incidentPlural = String(config.incidentPlural || state.incidentPlural || defaultState.incidentPlural);
 }
 
 function thresholdFor(totalCount) {
@@ -1259,6 +1301,33 @@ function makeClientEventId() {
 
 function sanitizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/$/, "");
+}
+
+function resolveRuntimeConfig() {
+  if (typeof window === "undefined") {
+    return {
+      profileId: "default",
+      defaultSchoolName: "Avon North",
+      appTitle: "Lanyard Tracker",
+      countLabel: "Total violations",
+      incidentSingular: "violation",
+      incidentPlural: "violations"
+    };
+  }
+
+  const url = new URL(window.location.href);
+  const profileId = String(url.searchParams.get("profile") || "").trim();
+  const profileConfig = PROFILE_CONFIGS[profileId] || {};
+  const inlineConfig = window.LANYARD_APP_CONFIG || {};
+
+  return {
+    profileId: String(inlineConfig.profileId || profileId || profileConfig.profileId || "default"),
+    defaultSchoolName: String(inlineConfig.defaultSchoolName || profileConfig.defaultSchoolName || "Avon North"),
+    appTitle: String(inlineConfig.appTitle || profileConfig.appTitle || "Lanyard Tracker"),
+    countLabel: String(inlineConfig.countLabel || profileConfig.countLabel || "Total violations"),
+    incidentSingular: String(inlineConfig.incidentSingular || profileConfig.incidentSingular || "violation"),
+    incidentPlural: String(inlineConfig.incidentPlural || profileConfig.incidentPlural || "violations")
+  };
 }
 
 function normalizeBoolean(value) {

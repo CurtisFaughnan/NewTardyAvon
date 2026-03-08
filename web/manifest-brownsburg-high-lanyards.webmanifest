@@ -1,0 +1,15 @@
+{
+  "name": "Brownsburg High School Lanyard Tracker",
+  "short_name": "BHS Lanyards",
+  "start_url": "./brownsburg-high-lanyards.html",
+  "display": "standalone",
+  "background_color": "#f7efe0",
+  "theme_color": "#17324d",
+  "icons": [
+    {
+      "src": "./assets/Avon_Crest.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

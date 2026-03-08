@@ -1,6 +1,10 @@
 const DEFAULT_SHEET_ID = '1RnnPmQITQtevn04cMKw_PMflLr7jbAeDJ3PfXZaBDwE';
 const DEFAULT_SCHOOL_NAME = 'Avon North Middle School';
 const DEFAULT_ADMIN_KEY = 'AvonNorth';
+const DEFAULT_APP_TITLE = 'Lanyard Tracker';
+const DEFAULT_COUNT_LABEL = 'Total violations';
+const DEFAULT_INCIDENT_SINGULAR = 'violation';
+const DEFAULT_INCIDENT_PLURAL = 'violations';
 const SHEETS = {
   students: 'Lanyard_Data',
   scans: 'lanyard_log',
@@ -57,16 +61,15 @@ function parseRequest_(e, method) {
 function routeRequest_(request) {
   switch (request.endpoint) {
     case 'health':
-      return { ok: true, settings: getSettings_(), mode: 'apps-script', schoolName: getSchoolName_() };
+      return Object.assign({ ok: true, settings: getSettings_(), mode: 'apps-script' }, getClientConfig_());
     case 'bootstrap':
-      return {
+      return Object.assign({
         thresholds: getThresholds_(),
         settings: getSettings_(),
         pendingEmails: getPendingEmails_(),
         mode: 'apps-script',
-        schoolName: getSchoolName_(),
         remainingDailyEmailQuota: MailApp.getRemainingDailyQuota()
-      };
+      }, getClientConfig_());
     case 'students':
       return getStudentById_(request.params.studentId || request.params.id || '');
     case 'scans':
@@ -135,6 +138,37 @@ function getAdminKey_() {
 
 function getSchoolName_() {
   return PropertiesService.getScriptProperties().getProperty('SCHOOL_NAME') || DEFAULT_SCHOOL_NAME;
+}
+
+function getAppTitle_() {
+  return PropertiesService.getScriptProperties().getProperty('APP_TITLE') || DEFAULT_APP_TITLE;
+}
+
+function getCountLabel_() {
+  return PropertiesService.getScriptProperties().getProperty('COUNT_LABEL') || DEFAULT_COUNT_LABEL;
+}
+
+function getIncidentSingular_() {
+  return PropertiesService.getScriptProperties().getProperty('INCIDENT_SINGULAR') || DEFAULT_INCIDENT_SINGULAR;
+}
+
+function getIncidentPlural_() {
+  return PropertiesService.getScriptProperties().getProperty('INCIDENT_PLURAL') || DEFAULT_INCIDENT_PLURAL;
+}
+
+function getClientConfig_() {
+  return {
+    schoolName: getSchoolName_(),
+    appTitle: getAppTitle_(),
+    countLabel: getCountLabel_(),
+    incidentSingular: getIncidentSingular_(),
+    incidentPlural: getIncidentPlural_()
+  };
+}
+
+function getProgramLabel_() {
+  const label = String(getAppTitle_() || '').trim();
+  return label || 'Student Tracker';
 }
 
 function getOrCreateSheet_(name, headers) {
@@ -529,7 +563,7 @@ function recordScan_(params) {
       parent_email: student.parent_email,
       total_count: totalCount,
       tier: threshold.title,
-      reason: threshold.title + ' reached at ' + totalCount + ' violations.',
+      reason: threshold.title + ' reached at ' + totalCount + ' ' + getIncidentPlural_() + '.',
       status: 'pending'
     });
   }
@@ -631,18 +665,20 @@ function sendParentEmail_(params) {
 
 function buildParentEmail_(student, totalCount, tierTitle) {
   const fullName = student.first_name + ' ' + student.last_name;
+  const incidentPlural = getIncidentPlural_();
+  const programLabel = getProgramLabel_();
   return {
-    subject: fullName + ' Lanyard Policy Notice (' + totalCount + ' total Lanyard Violations)',
+    subject: fullName + ' ' + programLabel + ' Notice (' + totalCount + ' total ' + incidentPlural + ')',
     body: [
       'Good afternoon,',
       '',
-      'This message is to inform you that ' + fullName + ' has reached ' + totalCount + ' recorded lanyard violations in our system.',
+      'This message is to inform you that ' + fullName + ' has reached ' + totalCount + ' recorded ' + incidentPlural + ' in our system.',
       '',
-      'This places them in ' + (tierTitle || 'a new tier') + ' of our lanyard policy.',
+      'This places them in ' + (tierTitle || 'a new tier') + ' of our ' + programLabel.toLowerCase() + ' process.',
       'Team: ' + (student.team || ''),
       'Class Year: ' + (student.class_year || ''),
       '',
-      'We kindly ask for your support in reinforcing the importance of adhering to our lanyard policy to ensure a safe and secure environment for all students.',
+      'We kindly ask for your support in reinforcing the importance of following school expectations in this area.',
       '',
       'Thank you for your partnership,',
       getSchoolName_() + ' Administration'

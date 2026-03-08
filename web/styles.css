@@ -128,6 +128,20 @@ h3 {
   box-shadow: 0 14px 28px rgba(23, 50, 77, 0.1);
 }
 
+.brand-badge {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(23, 50, 77, 0.98), rgba(67, 39, 17, 0.9));
+  color: #fffaf1;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  box-shadow: 0 14px 28px rgba(23, 50, 77, 0.14);
+}
+
 .compact-button {
   white-space: nowrap;
 }
@@ -495,6 +509,12 @@ body.scanner-open {
   .brand-mark {
     width: 56px;
     height: 56px;
+  }
+
+  .brand-badge {
+    width: 56px;
+    height: 56px;
+    font-size: 0.94rem;
   }
 
   .settings-modal,

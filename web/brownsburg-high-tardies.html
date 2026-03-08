@@ -4,18 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
-    <title>Lanyard Tracker</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260308h" />
+    <title>Brownsburg High School Tardy Tracker</title>
+    <link rel="manifest" href="./manifest-brownsburg-high-tardies.webmanifest?v=20260308h" />
     <link rel="stylesheet" href="./styles.css?v=20260308h" />
   </head>
   <body>
     <div class="page-shell">
       <header class="topbar">
         <div class="brand-inline">
-          <img class="brand-mark" src="./assets/Avon_Crest.png" alt="School crest" />
+          <div class="brand-badge" aria-hidden="true">BHS</div>
           <div>
-            <p id="brandEyebrow" class="eyebrow">Avon North</p>
-            <h1 id="brandTitle">Lanyard Tracker</h1>
+            <p id="brandEyebrow" class="eyebrow">Brownsburg High School</p>
+            <h1 id="brandTitle">Tardy Tracker</h1>
           </div>
         </div>
         <button id="settingsOpenBtn" class="ghost compact-button" type="button">Admin</button>
@@ -55,7 +55,7 @@
               <strong id="studentYear"></strong>
             </div>
             <div id="studentCountCard">
-              <span id="studentCountLabel">Total violations</span>
+              <span id="studentCountLabel">Total tardies</span>
               <strong id="studentCount"></strong>
             </div>
             <div id="studentThresholdCard" class="detail-wide">
@@ -203,6 +203,16 @@
       </div>
     </div>
 
+    <script>
+      window.LANYARD_APP_CONFIG = {
+        profileId: "brownsburg-high-tardies",
+        defaultSchoolName: "Brownsburg High School",
+        appTitle: "Tardy Tracker",
+        countLabel: "Total tardies",
+        incidentSingular: "tardy",
+        incidentPlural: "tardies"
+      };
+    </script>
     <script src="./vendor/html5-qrcode.min.js?v=20260308h"></script>
     <script type="module" src="./app.js?v=20260308h"></script>
   </body>
