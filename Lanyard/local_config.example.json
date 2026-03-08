@@ -1,0 +1,9 @@
+{
+  "ENABLE_EMAIL": true,
+  "ENABLE_EMAIL_HOME": true,
+  "SMTP_SERVER": "smtp.gmail.com",
+  "SMTP_PORT": 465,
+  "ADMIN_EMAIL": "your-email@example.com",
+  "ADMIN_APP_PASSWORD": "replace-with-local-secret",
+  "SCHOOL_NAME": "Avon North Middle School"
+}

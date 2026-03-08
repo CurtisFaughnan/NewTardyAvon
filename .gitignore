@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Desktop build artifacts
+Lanyard/build/
+Lanyard/dist/
+Lanyard/*.exe
+Lanyard/*.pkg
+Lanyard/*.pyz
+Lanyard/*.toc
+Lanyard/update_temp.exe
+Lanyard/run_update.py
+Lanyard/update_error.log
+
+# Local secrets and tokens
+Lanyard/credentials.json
+Lanyard/gmail_credentials.json
+Lanyard/gmail_token.pkl
+Lanyard/local_config.json
+
+# Local runtime data
+Lanyard/pending_emails.json
+Lanyard/pending_scans.json
+Lanyard/sent_emails.json
+Lanyard/settings.json
+Lanyard/*.xlsx
