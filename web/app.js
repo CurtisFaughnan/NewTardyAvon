@@ -1,5 +1,6 @@
 const STORAGE_KEY = "lanyard-mobile-shell-v2";
 const MAX_RECENT_SCANS = 12;
+const ASSET_VERSION = "20260308b";
 
 const sampleStudents = {
   "1001": {
@@ -956,7 +957,7 @@ function registerServiceWorker() {
       window.location.reload();
     });
     navigator.serviceWorker
-      .register("./service-worker.js")
+      .register(`./service-worker.js?v=${ASSET_VERSION}`)
       .then((registration) => registration.update())
       .catch(() => {});
   }
