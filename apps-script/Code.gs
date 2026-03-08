@@ -71,7 +71,12 @@ function routeRequest_(request) {
         remainingDailyEmailQuota: MailApp.getRemainingDailyQuota()
       }, getClientConfig_());
     case 'students':
-      return getStudentById_(request.params.studentId || request.params.id || '');
+      if (request.method === 'GET') {
+        return getStudentById_(request.params.studentId || request.params.id || '');
+      }
+      assertMethod_(request, 'POST');
+      assertAdmin_(request);
+      return addStudent_(request.params.student || request.params);
     case 'scans':
       assertMethod_(request, 'POST');
       return recordScan_(request.params);
@@ -282,6 +287,26 @@ function getStudents_() {
   return getRecords_(SHEETS.students, studentHeaders_());
 }
 
+function getSheetHeaders_(sheet, fallbackHeaders) {
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn > 0) {
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function(header) {
+      return String(header || '').trim();
+    });
+    if (headers.some(function(header) { return header; })) {
+      return headers;
+    }
+  }
+
+  sheet.getRange(1, 1, 1, fallbackHeaders.length).setValues([fallbackHeaders]);
+  return fallbackHeaders.slice();
+}
+
+function getStudentSheetHeaders_() {
+  const sheet = getOrCreateSheet_(SHEETS.students, studentHeaders_());
+  return getSheetHeaders_(sheet, studentHeaders_());
+}
+
 function normalizeStudentId_(value) {
   const normalized = String(value || '').trim().replace(/^0+/, '');
   return normalized || '0';
@@ -307,6 +332,80 @@ function sanitizeStudent_(student) {
     team: String(student.team || ''),
     parent_email: String(student.parent_email || '')
   };
+}
+
+function sanitizeStudentInput_(student) {
+  const normalized = {
+    student_id: String(student.student_id || student.studentId || '').trim().replace(/^0+/, ''),
+    first_name: String(student.first_name || student.firstName || '').trim(),
+    last_name: String(student.last_name || student.lastName || '').trim(),
+    class_year: String(student.class_year || student.classYear || '').trim(),
+    team: String(student.team || '').trim(),
+    parent_email: String(student.parent_email || student.parentEmail || '').trim()
+  };
+
+  if (!normalized.student_id) {
+    throw new Error('Student ID is required.');
+  }
+  if (!normalized.first_name) {
+    throw new Error('First name is required.');
+  }
+  if (!normalized.last_name) {
+    throw new Error('Last name is required.');
+  }
+  if (!normalized.class_year) {
+    throw new Error('Class year is required.');
+  }
+  if (normalized.parent_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized.parent_email)) {
+    throw new Error('Parent email must be valid or blank.');
+  }
+
+  return normalized;
+}
+
+function studentValueForHeader_(student, header) {
+  switch (String(header || '').trim()) {
+    case 'student_id':
+      return student.student_id;
+    case 'first_name':
+      return student.first_name;
+    case 'last_name':
+      return student.last_name;
+    case 'class_year':
+      return student.class_year;
+    case 'team':
+      return student.team;
+    case 'parent_email':
+      return student.parent_email;
+    default:
+      return '';
+  }
+}
+
+function addStudent_(student) {
+  const sanitized = sanitizeStudentInput_(student || {});
+  const existing = getStudents_().find(function(record) {
+    return normalizeStudentId_(record.student_id) === normalizeStudentId_(sanitized.student_id);
+  });
+  if (existing) {
+    throw new Error('A student with that ID already exists.');
+  }
+
+  const headers = getStudentSheetHeaders_().map(function(header) {
+    return String(header || '').trim();
+  });
+  const missingHeaders = ['student_id', 'first_name', 'last_name', 'class_year'].filter(function(header) {
+    return headers.indexOf(header) === -1;
+  });
+  if (missingHeaders.length > 0) {
+    throw new Error('Students sheet is missing required columns: ' + missingHeaders.join(', '));
+  }
+
+  appendRow_(SHEETS.students, headers, headers.map(function(header) {
+    return studentValueForHeader_(sanitized, header);
+  }));
+
+  return sanitizeStudent_(sanitized);
 }
 
 function getThresholds_() {

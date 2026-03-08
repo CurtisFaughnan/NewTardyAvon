@@ -35,7 +35,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308j";
+const ASSET_VERSION = "20260308k";
 
 const sampleStudents = {
   "1001": {
@@ -81,6 +81,7 @@ const defaultState = {
   recentScans: [],
   pendingEmails: [],
   queue: [],
+  localStudents: {},
   lastStudent: null,
   thresholds: normalizeThresholds(RUNTIME_CONFIG.defaultThresholds || DEFAULT_APP_THRESHOLDS)
 };
@@ -90,6 +91,7 @@ const elements = {
   form: document.getElementById("scanForm"),
   studentId: document.getElementById("studentId"),
   manualScanBtn: document.getElementById("manualScanBtn"),
+  addStudentOpenBtn: document.getElementById("addStudentOpenBtn"),
   scanMessage: document.getElementById("scanMessage"),
   brandEyebrow: document.getElementById("brandEyebrow"),
   brandTitle: document.getElementById("brandTitle"),
@@ -131,6 +133,18 @@ const elements = {
   queueEmailBtn: document.getElementById("queueEmailBtn"),
   sendEmailBtn: document.getElementById("sendEmailBtn"),
   clearPendingBtn: document.getElementById("clearPendingBtn"),
+  addStudentModal: document.getElementById("addStudentModal"),
+  addStudentForm: document.getElementById("addStudentForm"),
+  addStudentCloseBtn: document.getElementById("addStudentCloseBtn"),
+  addStudentMessage: document.getElementById("addStudentMessage"),
+  addStudentTeamField: document.getElementById("addStudentTeamField"),
+  addStudentStudentId: document.getElementById("addStudentStudentId"),
+  addStudentFirstName: document.getElementById("addStudentFirstName"),
+  addStudentLastName: document.getElementById("addStudentLastName"),
+  addStudentClassYear: document.getElementById("addStudentClassYear"),
+  addStudentTeam: document.getElementById("addStudentTeam"),
+  addStudentParentEmail: document.getElementById("addStudentParentEmail"),
+  addStudentSubmitBtn: document.getElementById("addStudentSubmitBtn"),
   cameraScanBtn: document.getElementById("cameraScanBtn"),
   scannerModal: document.getElementById("scannerModal"),
   scannerMount: document.getElementById("scannerMount"),
@@ -145,7 +159,9 @@ const scannerState = {
 };
 const uiState = {
   settingsOpen: false,
-  settingsUnlocked: false
+  settingsUnlocked: false,
+  addStudentOpen: false,
+  addStudentSaving: false
 };
 const submissionState = {
   inFlight: false
@@ -166,6 +182,7 @@ async function init() {
 
 function wireEvents() {
   elements.form.addEventListener("submit", handleScan);
+  elements.addStudentOpenBtn.addEventListener("click", openAddStudentModal);
   elements.settingsOpenBtn.addEventListener("click", openSettings);
   elements.settingsCloseBtn.addEventListener("click", closeSettings);
   elements.unlockSettingsBtn.addEventListener("click", handleSettingsUnlock);
@@ -176,6 +193,8 @@ function wireEvents() {
   elements.queueEmailBtn.addEventListener("click", handleQueueEmail);
   elements.sendEmailBtn.addEventListener("click", handleSendEmail);
   elements.clearPendingBtn.addEventListener("click", handleClearPending);
+  elements.addStudentForm.addEventListener("submit", handleAddStudentSubmit);
+  elements.addStudentCloseBtn.addEventListener("click", closeAddStudentModal);
   elements.addThresholdBtn.addEventListener("click", handleAddThreshold);
   elements.saveThresholdsBtn.addEventListener("click", handleSaveThresholds);
   elements.thresholdList.addEventListener("change", handleThresholdEditorChange);
@@ -187,6 +206,11 @@ function wireEvents() {
       closeSettings();
     }
   });
+  elements.addStudentModal.addEventListener("click", (event) => {
+    if (event.target === elements.addStudentModal) {
+      closeAddStudentModal();
+    }
+  });
   elements.scannerModal.addEventListener("click", (event) => {
     if (event.target === elements.scannerModal) {
       closeScanner();
@@ -195,6 +219,10 @@ function wireEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.scannerModal.hidden) {
       closeScanner();
+      return;
+    }
+    if (event.key === "Escape" && !elements.addStudentModal.hidden) {
+      closeAddStudentModal();
       return;
     }
     if (event.key === "Escape" && !elements.settingsModal.hidden) {
@@ -296,6 +324,7 @@ function render() {
   elements.queueEmailBtn.disabled = !state.lastStudent;
   elements.sendEmailBtn.disabled = !state.lastStudent || !state.lastStudent.parent_email;
   updateScanControls();
+  renderAddStudentForm();
   renderStudent();
   renderRecentScans();
   renderPendingEmails();
@@ -372,7 +401,7 @@ function renderRecentScans() {
   const items = state.recentScans.map((scan) => `
     <li>
       <strong>${escapeHtml(scan.name)}</strong>
-      <small>${escapeHtml(scan.student_id)} | ${escapeHtml(scan.team || "No team")}</small>
+      <small>${escapeHtml(formatRecentScanIdentity(scan))}</small>
       <small>${escapeHtml(countLabel)} ${escapeHtml(String(scan.total_count || 0))} | Section ${escapeHtml(String(scan.section || 1))} | ${escapeHtml(scan.synced ? "Synced" : "Queued")}</small>
     </li>
   `).join("");
@@ -571,9 +600,16 @@ function normalizeStoredState(nextState) {
     countLabel: String(nextState.countLabel || defaultState.countLabel),
     incidentSingular: String(nextState.incidentSingular || defaultState.incidentSingular),
     incidentPlural: String(nextState.incidentPlural || defaultState.incidentPlural),
+    localStudents: normalizeStudentDirectory(nextState.localStudents || {}),
     thresholds: normalizeThresholds(nextState.thresholds || defaultState.thresholds),
     scannedKeys: pruneScannedKeys(nextState.scannedKeys)
   };
+}
+
+function formatRecentScanIdentity(scan) {
+  const studentId = String(scan.student_id || "").trim();
+  const team = String(scan.team || "").trim();
+  return team ? `${studentId} | ${team}` : studentId;
 }
 
 function pruneScannedKeys(scannedKeys = {}) {
@@ -591,6 +627,70 @@ function normalizeStudentIdKey(value) {
   return normalized || "0";
 }
 
+function normalizeStudentIdValue(value) {
+  return String(value || "").trim().replace(/^0+/, "");
+}
+
+function normalizeStudentRecord(student = {}) {
+  return {
+    student_id: normalizeStudentIdValue(student.student_id || student.studentId || ""),
+    first_name: String(student.first_name || student.firstName || "").trim(),
+    last_name: String(student.last_name || student.lastName || "").trim(),
+    class_year: String(student.class_year || student.classYear || "").trim(),
+    team: String(student.team || "").trim(),
+    parent_email: String(student.parent_email || student.parentEmail || "").trim()
+  };
+}
+
+function normalizeStudentDirectory(directory = {}) {
+  return Object.values(directory).reduce((next, student) => {
+    const normalized = normalizeStudentRecord(student);
+    if (normalized.student_id) {
+      next[normalized.student_id] = normalized;
+    }
+    return next;
+  }, {});
+}
+
+function readAddStudentForm() {
+  return normalizeStudentRecord({
+    student_id: elements.addStudentStudentId.value,
+    first_name: elements.addStudentFirstName.value,
+    last_name: elements.addStudentLastName.value,
+    class_year: elements.addStudentClassYear.value,
+    team: elements.addStudentTeam.value,
+    parent_email: elements.addStudentParentEmail.value
+  });
+}
+
+function validateStudentRecord(student) {
+  const normalized = normalizeStudentRecord(student);
+  if (!normalized.student_id) {
+    throw new Error("Student ID is required.");
+  }
+  if (!normalized.first_name) {
+    throw new Error("First name is required.");
+  }
+  if (!normalized.last_name) {
+    throw new Error("Last name is required.");
+  }
+  if (!normalized.class_year) {
+    throw new Error("Class year is required.");
+  }
+  if (normalized.parent_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized.parent_email)) {
+    throw new Error("Enter a valid parent email or leave it blank.");
+  }
+  if (RUNTIME_CONFIG.showTeam === false) {
+    normalized.team = "";
+  }
+  return normalized;
+}
+
+function findStudentById(studentId) {
+  const normalizedStudentId = normalizeStudentIdKey(studentId);
+  return state.localStudents[normalizedStudentId] || sampleStudents[normalizedStudentId] || null;
+}
+
 function makeScanKey(studentId, section = state.currentSection, dayKey = todayKey()) {
   return `${dayKey}:${Number(section || 1)}:${normalizeStudentIdKey(studentId)}`;
 }
@@ -606,12 +706,66 @@ function rememberLocalScan(studentId, section = state.currentSection) {
 function updateScanControls() {
   elements.studentId.disabled = submissionState.inFlight;
   elements.manualScanBtn.disabled = submissionState.inFlight;
+  elements.addStudentOpenBtn.disabled = submissionState.inFlight;
   elements.cameraScanBtn.disabled = submissionState.inFlight;
 }
 
 function setScanBusy(isBusy) {
   submissionState.inFlight = isBusy;
   updateScanControls();
+}
+
+function renderAddStudentForm() {
+  if (elements.addStudentTeamField) {
+    elements.addStudentTeamField.hidden = RUNTIME_CONFIG.showTeam === false;
+  }
+  updateAddStudentControls();
+}
+
+function updateAddStudentControls() {
+  const isSaving = uiState.addStudentSaving;
+  elements.addStudentStudentId.disabled = isSaving;
+  elements.addStudentFirstName.disabled = isSaving;
+  elements.addStudentLastName.disabled = isSaving;
+  elements.addStudentClassYear.disabled = isSaving;
+  elements.addStudentTeam.disabled = isSaving;
+  elements.addStudentParentEmail.disabled = isSaving;
+  elements.addStudentSubmitBtn.disabled = isSaving;
+  elements.addStudentCloseBtn.disabled = isSaving;
+}
+
+function openAddStudentModal() {
+  uiState.addStudentOpen = true;
+  uiState.addStudentSaving = false;
+  resetAddStudentForm(elements.studentId.value.trim());
+  elements.addStudentModal.hidden = false;
+  document.body.classList.add("student-entry-open");
+  elements.addStudentStudentId.focus();
+}
+
+function closeAddStudentModal(force = false) {
+  if (uiState.addStudentSaving && !force) {
+    return;
+  }
+
+  uiState.addStudentOpen = false;
+  elements.addStudentModal.hidden = true;
+  document.body.classList.remove("student-entry-open");
+}
+
+function resetAddStudentForm(seedStudentId = "") {
+  elements.addStudentForm.reset();
+  elements.addStudentStudentId.value = seedStudentId ? normalizeStudentIdKey(seedStudentId) : "";
+  showAddStudentMessage(
+    state.apiBase
+      ? "Add a student to the connected roster."
+      : "Add a student locally. They will be available only in this browser until a backend is configured."
+  );
+  renderAddStudentForm();
+}
+
+function showAddStudentMessage(message) {
+  elements.addStudentMessage.textContent = message;
 }
 
 function openSettings() {
@@ -656,6 +810,56 @@ function handleSettingsLock() {
 
 function showSettingsMessage(message) {
   elements.settingsMessage.textContent = message;
+}
+
+async function handleAddStudentSubmit(event) {
+  event.preventDefault();
+
+  let student;
+  try {
+    student = validateStudentRecord(readAddStudentForm());
+  } catch (error) {
+    showAddStudentMessage(error.message);
+    return;
+  }
+
+  uiState.addStudentSaving = true;
+  updateAddStudentControls();
+
+  try {
+    if (state.apiBase) {
+      const savedStudent = normalizeStudentRecord(await apiFetch("/api/students", {
+        method: "POST",
+        body: JSON.stringify({ student })
+      }, { admin: true }));
+      state.backendConnected = true;
+      elements.studentId.value = savedStudent.student_id;
+      persist();
+      render();
+      closeAddStudentModal(true);
+      showMessage(`Added ${savedStudent.first_name} ${savedStudent.last_name}. You can scan them now.`);
+      return;
+    }
+
+    if (findStudentById(student.student_id)) {
+      throw new Error("A student with that ID already exists in this browser.");
+    }
+
+    state.localStudents[student.student_id] = student;
+    if (typeof state.studentTotals[student.student_id] === "undefined") {
+      state.studentTotals[student.student_id] = 0;
+    }
+    elements.studentId.value = student.student_id;
+    persist();
+    render();
+    closeAddStudentModal(true);
+    showMessage(`Added ${student.first_name} ${student.last_name}. You can scan them now.`);
+  } catch (error) {
+    showAddStudentMessage(error.message || "Unable to add the student.");
+  } finally {
+    uiState.addStudentSaving = false;
+    updateAddStudentControls();
+  }
 }
 
 async function handleScan(event) {
@@ -728,9 +932,9 @@ async function handleConnectedScan(studentId) {
 }
 
 function handleMockScan(studentId) {
-  const student = sampleStudents[studentId];
+  const student = findStudentById(studentId);
   if (!student) {
-    showMessage("Student not found in mock mode. Try 1001, 1002, or 1003.");
+    showMessage("Student not found. Use Add student or connect the backend.");
     return;
   }
 

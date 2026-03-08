@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Brownsburg High School Tardy Tracker</title>
-    <link rel="manifest" href="./manifest-brownsburg-high-tardies.webmanifest?v=20260308j" />
-    <link rel="stylesheet" href="./styles.css?v=20260308j" />
+    <link rel="manifest" href="./manifest-brownsburg-high-tardies.webmanifest?v=20260308k" />
+    <link rel="stylesheet" href="./styles.css?v=20260308k" />
   </head>
   <body>
     <div class="page-shell">
@@ -32,6 +32,9 @@
               <button id="manualScanBtn" type="submit">Enter</button>
             </div>
           </form>
+          <div class="scan-secondary-row">
+            <button id="addStudentOpenBtn" class="ghost" type="button">Add student</button>
+          </div>
           <p id="scanMessage" class="message">Ready to scan.</p>
         </section>
 
@@ -203,6 +206,50 @@
       </div>
     </div>
 
+    <div id="addStudentModal" class="settings-modal" hidden>
+      <div class="settings-dialog card student-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="addStudentTitle">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Roster</p>
+            <h2 id="addStudentTitle">Add student</h2>
+          </div>
+          <button id="addStudentCloseBtn" class="ghost" type="button">Close</button>
+        </div>
+        <form id="addStudentForm" class="student-entry-form">
+          <div class="student-entry-grid">
+            <label class="stack-field" for="addStudentStudentId">
+              <span>Student ID</span>
+              <input id="addStudentStudentId" type="text" inputmode="numeric" autocomplete="off" required />
+            </label>
+            <label class="stack-field" for="addStudentFirstName">
+              <span>First name</span>
+              <input id="addStudentFirstName" type="text" autocomplete="off" required />
+            </label>
+            <label class="stack-field" for="addStudentLastName">
+              <span>Last name</span>
+              <input id="addStudentLastName" type="text" autocomplete="off" required />
+            </label>
+            <label class="stack-field" for="addStudentClassYear">
+              <span>Class year</span>
+              <input id="addStudentClassYear" type="text" inputmode="numeric" autocomplete="off" required />
+            </label>
+            <label id="addStudentTeamField" class="stack-field" for="addStudentTeam">
+              <span>Team</span>
+              <input id="addStudentTeam" type="text" autocomplete="off" />
+            </label>
+            <label class="stack-field" for="addStudentParentEmail">
+              <span>Parent email</span>
+              <input id="addStudentParentEmail" type="email" autocomplete="off" />
+            </label>
+          </div>
+          <p id="addStudentMessage" class="helper">Add a student to the connected roster.</p>
+          <div class="action-row wrap-row">
+            <button id="addStudentSubmitBtn" type="submit">Save student</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script>
       window.LANYARD_APP_CONFIG = {
         profileId: "brownsburg-high-tardies",
@@ -214,7 +261,7 @@
         showTeam: false
       };
     </script>
-    <script src="./vendor/html5-qrcode.min.js?v=20260308j"></script>
-    <script type="module" src="./app.js?v=20260308j"></script>
+    <script src="./vendor/html5-qrcode.min.js?v=20260308k"></script>
+    <script type="module" src="./app.js?v=20260308k"></script>
   </body>
 </html>
