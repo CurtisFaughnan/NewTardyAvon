@@ -540,6 +540,29 @@ function repairTodayHighlights() {
   refreshDailyHighlights_();
 }
 
+function installNightlyResetTrigger() {
+  removeTriggersForFunction_('runDailyHighlightReset');
+  ScriptApp.newTrigger('runDailyHighlightReset')
+    .timeBased()
+    .atHour(0)
+    .nearMinute(0)
+    .everyDays(1)
+    .inTimezone(Session.getScriptTimeZone())
+    .create();
+}
+
+function removeNightlyResetTrigger() {
+  removeTriggersForFunction_('runDailyHighlightReset');
+}
+
+function removeTriggersForFunction_(functionName) {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction && trigger.getHandlerFunction() === functionName) {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+}
+
 function recordScan_(params) {
   const student = getStudentById_(params.studentId);
   const settings = getSettings_();
