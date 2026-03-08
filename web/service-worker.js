@@ -1,19 +1,19 @@
-const CACHE_NAME = "lanyard-shell-v14";
+const CACHE_NAME = "lanyard-shell-v15";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./avon-tardies.html",
   "./brownsburg-high-lanyards.html",
   "./brownsburg-high-tardies.html",
-  "./styles.css?v=20260308l",
-  "./app.js?v=20260308l",
-  "./manifest.webmanifest?v=20260308l",
-  "./manifest-avon-tardies.webmanifest?v=20260308l",
-  "./manifest-brownsburg-high-lanyards.webmanifest?v=20260308l",
-  "./manifest-brownsburg-high-tardies.webmanifest?v=20260308l",
+  "./styles.css?v=20260308m",
+  "./app.js?v=20260308m",
+  "./manifest.webmanifest?v=20260308m",
+  "./manifest-avon-tardies.webmanifest?v=20260308m",
+  "./manifest-brownsburg-high-lanyards.webmanifest?v=20260308m",
+  "./manifest-brownsburg-high-tardies.webmanifest?v=20260308m",
   "./assets/Avon_Crest.png",
   "./assets/Brownsburg_Bulldog.webp",
-  "./vendor/html5-qrcode.min.js?v=20260308l"
+  "./vendor/html5-qrcode.min.js?v=20260308m"
 ];
 
 self.addEventListener("install", (event) => {

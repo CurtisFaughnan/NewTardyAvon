@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308l";
+const ASSET_VERSION = "20260308m";
 
 const sampleStudents = {
   "1001": {
@@ -777,6 +777,17 @@ function showAddStudentMessage(message) {
   elements.addStudentMessage.textContent = message;
 }
 
+function formatAddStudentError(error) {
+  const message = String(error && error.message ? error.message : "").trim();
+  if (isAppsScriptBackend() && message === "Student not found.") {
+    return "This Google Apps Script is still on the old version. Paste the latest Code.gs into Apps Script, redeploy the web app, then try Add student again.";
+  }
+  if (message === "Admin key is missing or incorrect.") {
+    return "The saved admin key in this app does not match the ADMIN_KEY in Apps Script. Re-enter it in Admin settings and try again.";
+  }
+  return message || "Unable to add the student.";
+}
+
 function openSettings() {
   uiState.settingsOpen = true;
   elements.settingsModal.hidden = false;
@@ -864,7 +875,7 @@ async function handleAddStudentSubmit(event) {
     closeAddStudentModal(true);
     showMessage(`Added ${student.first_name} ${student.last_name}. You can scan them now.`);
   } catch (error) {
-    showAddStudentMessage(error.message || "Unable to add the student.");
+    showAddStudentMessage(formatAddStudentError(error));
   } finally {
     uiState.addStudentSaving = false;
     updateAddStudentControls();
