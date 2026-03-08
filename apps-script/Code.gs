@@ -31,6 +31,7 @@ function doPost(e) {
 
 function handleRequest_(e, method) {
   try {
+    maintainScanSheet_();
     const request = parseRequest_(e, method);
     const data = routeRequest_(request);
     return jsonResponse_(data);
@@ -139,9 +140,22 @@ function getOrCreateSheet_(name, headers) {
 
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  } else if (name !== SHEETS.students) {
+    ensureHeaders_(sheet, headers);
   }
 
   return sheet;
+}
+
+function ensureHeaders_(sheet, headers) {
+  const existing = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  const needsUpdate = headers.some(function(header, index) {
+    return String(existing[index] || '').trim() !== header;
+  });
+
+  if (needsUpdate) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
 }
 
 function getRecords_(sheetName, headers) {
@@ -169,6 +183,10 @@ function getRecords_(sheetName, headers) {
 function appendRow_(sheetName, headers, row) {
   const sheet = getOrCreateSheet_(sheetName, headers);
   sheet.appendRow(row);
+  return {
+    sheet: sheet,
+    rowIndex: sheet.getLastRow()
+  };
 }
 
 function clearSheetData_(sheetName, headers) {
@@ -362,6 +380,28 @@ function getScanRows_() {
   return getRecords_(SHEETS.scans, scanHeaders_());
 }
 
+function maintainScanSheet_() {
+  const properties = PropertiesService.getScriptProperties();
+  const today = todayKey_();
+  const lastReset = properties.getProperty('LAST_DAILY_HIGHLIGHT_RESET') || '';
+  if (lastReset === today) {
+    return;
+  }
+
+  clearDailyHighlights_();
+  properties.setProperty('LAST_DAILY_HIGHLIGHT_RESET', today);
+}
+
+function clearDailyHighlights_() {
+  const sheet = getOrCreateSheet_(SHEETS.scans, scanHeaders_());
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return;
+  }
+
+  sheet.getRange(2, 1, lastRow - 1, 8).setBackground('#ffffff');
+}
+
 function recordScan_(params) {
   const student = getStudentById_(params.studentId);
   const settings = getSettings_();
@@ -395,8 +435,8 @@ function recordScan_(params) {
 
   const duplicate = scanRows.some(function(row) {
     return normalizeStudentId_(row.student_id) === normalizeStudentId_(student.student_id)
-      && String(row.section || currentSection) === String(currentSection)
-      && String(row.scan_date || '').slice(0, 10) === today;
+      && Number(readScanSection_(row)) === currentSection
+      && readScanDate_(row) === today;
   });
   const previousCount = scanRows.filter(function(row) {
     return normalizeStudentId_(row.student_id) === normalizeStudentId_(student.student_id);
@@ -413,7 +453,7 @@ function recordScan_(params) {
   }
 
   const timestamp = new Date().toISOString();
-  appendRow_(SHEETS.scans, scanHeaders_(), [
+  const appended = appendRow_(SHEETS.scans, scanHeaders_(), [
     timestamp,
     student.student_id,
     student.first_name + ' ' + student.last_name,
@@ -426,6 +466,7 @@ function recordScan_(params) {
     today,
     clientEventId
   ]);
+  colorScanRow_(appended.sheet, appended.rowIndex, threshold);
 
   let pendingEmailQueued = false;
   if (toBoolean_(settings.email_home_enabled) && String(threshold.title).trim().toLowerCase() === 'email home') {
@@ -463,10 +504,36 @@ function decorateStudent_(student, totalCount, threshold) {
   return cleanStudent;
 }
 
+function readScanSection_(row) {
+  const raw = row.section;
+  if (raw === null || raw === '' || typeof raw === 'undefined') {
+    return 1;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function readScanDate_(row) {
+  const explicitDate = String(row.scan_date || '').slice(0, 10);
+  if (explicitDate) {
+    return explicitDate;
+  }
+
+  const timestamp = String(row.timestamp || '').trim();
+  const match = timestamp.match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : '';
+}
+
 function thresholdForCount_(thresholds, totalCount) {
   return thresholds.find(function(threshold) {
     return totalCount >= Number(threshold.min) && totalCount <= Number(threshold.max);
   }) || thresholds[thresholds.length - 1];
+}
+
+function colorScanRow_(sheet, rowIndex, threshold) {
+  const hex = threshold.hex || rgbToHex_(threshold.color || [1, 1, 1]);
+  sheet.getRange(rowIndex, 1, 1, 8).setBackground(hex);
 }
 
 function startNewSection_() {

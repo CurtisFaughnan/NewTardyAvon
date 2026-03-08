@@ -1,6 +1,6 @@
 const STORAGE_KEY = "lanyard-mobile-shell-v2";
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308c";
+const ASSET_VERSION = "20260308d";
 
 const sampleStudents = {
   "1001": {
@@ -54,6 +54,7 @@ const state = loadState();
 const elements = {
   form: document.getElementById("scanForm"),
   studentId: document.getElementById("studentId"),
+  manualScanBtn: document.getElementById("manualScanBtn"),
   scanMessage: document.getElementById("scanMessage"),
   settingsOpenBtn: document.getElementById("settingsOpenBtn"),
   settingsModal: document.getElementById("settingsModal"),
@@ -102,6 +103,9 @@ const scannerState = {
 const uiState = {
   settingsOpen: false,
   settingsUnlocked: false
+};
+const submissionState = {
+  inFlight: false
 };
 
 init().catch((error) => {
@@ -202,22 +206,24 @@ function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return clone(defaultState);
+      return normalizeStoredState(clone(defaultState));
     }
-    return {
+    return normalizeStoredState({
       ...clone(defaultState),
       ...JSON.parse(raw)
-    };
+    });
   } catch {
-    return clone(defaultState);
+    return normalizeStoredState(clone(defaultState));
   }
 }
 
 function persist() {
+  state.scannedKeys = pruneScannedKeys(state.scannedKeys);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function render() {
+  state.scannedKeys = pruneScannedKeys(state.scannedKeys);
   elements.queueCount.textContent = String(state.queue.length);
   elements.sectionCount.textContent = String(state.currentSection || 1);
   elements.resetBadge.textContent = formatResetTime(state.lastResetTime);
@@ -231,6 +237,7 @@ function render() {
   elements.adminUnlockInput.value = state.adminKey;
   elements.queueEmailBtn.disabled = !state.lastStudent;
   elements.sendEmailBtn.disabled = !state.lastStudent || !state.lastStudent.parent_email;
+  updateScanControls();
   renderStudent();
   renderRecentScans();
   renderPendingEmails();
@@ -290,6 +297,51 @@ function renderThresholds() {
   }).join("");
 }
 
+function normalizeStoredState(nextState) {
+  return {
+    ...nextState,
+    scannedKeys: pruneScannedKeys(nextState.scannedKeys)
+  };
+}
+
+function pruneScannedKeys(scannedKeys = {}) {
+  const activeDay = `${todayKey()}:`;
+  return Object.entries(scannedKeys).reduce((next, [key, value]) => {
+    if (String(key).startsWith(activeDay) && value) {
+      next[key] = true;
+    }
+    return next;
+  }, {});
+}
+
+function normalizeStudentIdKey(value) {
+  const normalized = String(value || "").trim().replace(/^0+/, "");
+  return normalized || "0";
+}
+
+function makeScanKey(studentId, section = state.currentSection, dayKey = todayKey()) {
+  return `${dayKey}:${Number(section || 1)}:${normalizeStudentIdKey(studentId)}`;
+}
+
+function hasLocalDuplicateScan(studentId, section = state.currentSection) {
+  return Boolean(state.scannedKeys[makeScanKey(studentId, section)]);
+}
+
+function rememberLocalScan(studentId, section = state.currentSection) {
+  state.scannedKeys[makeScanKey(studentId, section)] = true;
+}
+
+function updateScanControls() {
+  elements.studentId.disabled = submissionState.inFlight;
+  elements.manualScanBtn.disabled = submissionState.inFlight;
+  elements.cameraScanBtn.disabled = submissionState.inFlight;
+}
+
+function setScanBusy(isBusy) {
+  submissionState.inFlight = isBusy;
+  updateScanControls();
+}
+
 function openSettings() {
   uiState.settingsOpen = true;
   elements.settingsModal.hidden = false;
@@ -340,15 +392,31 @@ async function handleScan(event) {
 }
 
 async function submitStudentId(studentId) {
-  if (!studentId) {
+  const normalizedStudentId = normalizeStudentIdKey(studentId);
+  if (!normalizedStudentId) {
     showMessage("Enter a student ID first.");
     return;
   }
 
-  if (state.apiBase) {
-    await handleConnectedScan(studentId);
-  } else {
-    handleMockScan(studentId);
+  if (submissionState.inFlight) {
+    return;
+  }
+
+  if (hasLocalDuplicateScan(normalizedStudentId)) {
+    showMessage("This student has already been scanned today in the current section.");
+    elements.studentId.value = "";
+    return;
+  }
+
+  setScanBusy(true);
+  try {
+    if (state.apiBase) {
+      await handleConnectedScan(normalizedStudentId);
+    } else {
+      handleMockScan(normalizedStudentId);
+    }
+  } finally {
+    setScanBusy(false);
   }
 }
 
@@ -373,6 +441,7 @@ async function handleConnectedScan(studentId) {
   } catch (error) {
     elements.studentId.value = "";
     if (error.retriable) {
+      rememberLocalScan(studentId);
       enqueueScan(payload);
       persist();
       render();
@@ -393,13 +462,12 @@ function handleMockScan(studentId) {
     return;
   }
 
-  const scanKey = `${todayKey()}:${state.currentSection}:${student.student_id}`;
-  if (state.scannedKeys[scanKey]) {
-    showMessage("This student has already been scanned in the current section.");
+  if (hasLocalDuplicateScan(student.student_id)) {
+    showMessage("This student has already been scanned today in the current section.");
     return;
   }
 
-  state.scannedKeys[scanKey] = true;
+  rememberLocalScan(student.student_id);
   state.studentTotals[student.student_id] = (state.studentTotals[student.student_id] || 0) + 1;
   const totalCount = state.studentTotals[student.student_id];
   const threshold = thresholdFor(totalCount);
@@ -606,11 +674,16 @@ async function trySyncQueue() {
 function applyConnectedScanResult(result, payload, fromQueue = false) {
   applySettings({ current_section: result.currentSection || state.currentSection });
   state.lastStudent = result.student;
+  const scanSection = (result.scan && result.scan.section) || result.currentSection || state.currentSection;
+
+  if (result.student && result.student.student_id) {
+    rememberLocalScan(result.student.student_id, scanSection);
+  }
 
   if (result.duplicate) {
     persist();
     render();
-    showMessage("This student has already been scanned in the current section.");
+    showMessage("This student has already been scanned today in the current section.");
     return;
   }
 
@@ -619,7 +692,7 @@ function applyConnectedScanResult(result, payload, fromQueue = false) {
     name: `${result.student.first_name} ${result.student.last_name}`,
     team: result.student.team,
     total_count: result.student.total_count,
-    section: (result.scan && result.scan.section) || state.currentSection,
+    section: scanSection,
     synced: true,
     timestamp: (result.scan && result.scan.timestamp) || new Date().toISOString(),
     clientEventId: payload.clientEventId
@@ -988,7 +1061,11 @@ function hexToRgbArray(hex) {
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatResetTime(value) {

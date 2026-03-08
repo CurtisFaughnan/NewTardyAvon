@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lanyard Tracker</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260308c" />
-    <link rel="stylesheet" href="./styles.css?v=20260308c" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260308d" />
+    <link rel="stylesheet" href="./styles.css?v=20260308d" />
   </head>
   <body>
     <div class="page-shell">
@@ -29,7 +29,7 @@
             <label for="studentId">Student ID #</label>
             <div class="input-row">
               <input id="studentId" name="studentId" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter student ID #" required />
-              <button type="submit">Enter</button>
+              <button id="manualScanBtn" type="submit">Enter</button>
             </div>
           </form>
           <p id="scanMessage" class="message">Ready to scan.</p>
@@ -198,7 +198,7 @@
       </div>
     </div>
 
-    <script src="./vendor/html5-qrcode.min.js?v=20260308c"></script>
-    <script type="module" src="./app.js?v=20260308c"></script>
+    <script src="./vendor/html5-qrcode.min.js?v=20260308d"></script>
+    <script type="module" src="./app.js?v=20260308d"></script>
   </body>
 </html>
