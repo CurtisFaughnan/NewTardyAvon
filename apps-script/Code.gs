@@ -869,6 +869,23 @@ function buildParentEmail_(student, totalCount, tierTitle) {
   const fullName = student.first_name + ' ' + student.last_name;
   const incidentPlural = getIncidentPlural_();
   const programLabel = getProgramLabel_();
+  const isTardyProgram = /tardy/i.test(programLabel) || /\btard(?:y|ies)\b/i.test(getIncidentSingular_() + ' ' + incidentPlural);
+  if (isTardyProgram) {
+    const tardySweepLabel = totalCount + ' tardy sweep' + (totalCount === 1 ? '' : 's');
+    return {
+      subject: fullName + ' ' + programLabel + ' Notice (' + totalCount + ' total ' + incidentPlural + ')',
+      body: [
+        'Good afternoon,',
+        '',
+        'This message is to inform you that ' + fullName + ' has been caught in ' + tardySweepLabel + '.',
+        'This places them in the ' + (tierTitle || 'Email Home') + ' tier of our tardy tracker.',
+        '',
+        'Thank you,',
+        getSchoolName_() + ' Administration'
+      ].join('\n')
+    };
+  }
+
   return {
     subject: fullName + ' ' + programLabel + ' Notice (' + totalCount + ' total ' + incidentPlural + ')',
     body: [

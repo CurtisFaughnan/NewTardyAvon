@@ -468,6 +468,8 @@ h3 {
 
 body.settings-open,
 body.student-entry-open,
+body.pending-review-open,
+body.email-composer-open,
 body.scanner-open {
   overflow: hidden;
 }
@@ -476,7 +478,17 @@ body.scanner-open {
   width: min(720px, 100%);
 }
 
+.review-dialog {
+  width: min(760px, 100%);
+}
+
 .student-entry-form {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.email-composer-form {
   display: grid;
   gap: 0.9rem;
   margin-top: 0.9rem;
@@ -486,6 +498,46 @@ body.scanner-open {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.review-list .helper {
+  margin: 0;
+}
+
+.review-list li {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.review-item-head,
+.review-item-meta,
+.review-item-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.review-item-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.review-item-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(23, 50, 77, 0.08);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.email-composer-form textarea {
+  min-height: 260px;
+  resize: vertical;
 }
 
 .scanner-mount {
@@ -522,7 +574,10 @@ body.scanner-open {
   .section-head,
   .threshold-item-head,
   .threshold-item-actions,
-  .threshold-item-preview {
+  .threshold-item-preview,
+  .review-item-head,
+  .review-item-meta,
+  .review-item-actions {
     flex-direction: column;
     align-items: stretch;
   }

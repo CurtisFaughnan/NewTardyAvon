@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260308m";
+const ASSET_VERSION = "20260312a";
 
 const sampleStudents = {
   "1001": {
@@ -141,6 +141,7 @@ const elements = {
   refreshBackendBtn: document.getElementById("refreshBackendBtn"),
   queueEmailBtn: document.getElementById("queueEmailBtn"),
   sendEmailBtn: document.getElementById("sendEmailBtn"),
+  reviewPendingBtn: document.getElementById("reviewPendingBtn"),
   clearPendingBtn: document.getElementById("clearPendingBtn"),
   addStudentModal: document.getElementById("addStudentModal"),
   addStudentForm: document.getElementById("addStudentForm"),
@@ -154,6 +155,18 @@ const elements = {
   addStudentTeam: document.getElementById("addStudentTeam"),
   addStudentParentEmail: document.getElementById("addStudentParentEmail"),
   addStudentSubmitBtn: document.getElementById("addStudentSubmitBtn"),
+  pendingReviewModal: document.getElementById("pendingReviewModal"),
+  pendingReviewCloseBtn: document.getElementById("pendingReviewCloseBtn"),
+  pendingReviewMessage: document.getElementById("pendingReviewMessage"),
+  pendingReviewList: document.getElementById("pendingReviewList"),
+  emailComposerModal: document.getElementById("emailComposerModal"),
+  emailComposerCloseBtn: document.getElementById("emailComposerCloseBtn"),
+  emailComposerForm: document.getElementById("emailComposerForm"),
+  emailComposerTo: document.getElementById("emailComposerTo"),
+  emailComposerSubject: document.getElementById("emailComposerSubject"),
+  emailComposerBody: document.getElementById("emailComposerBody"),
+  emailComposerMessage: document.getElementById("emailComposerMessage"),
+  emailComposerSendBtn: document.getElementById("emailComposerSendBtn"),
   cameraScanBtn: document.getElementById("cameraScanBtn"),
   scannerModal: document.getElementById("scannerModal"),
   scannerMount: document.getElementById("scannerMount"),
@@ -170,7 +183,11 @@ const uiState = {
   settingsOpen: false,
   settingsUnlocked: false,
   addStudentOpen: false,
-  addStudentSaving: false
+  addStudentSaving: false,
+  pendingReviewOpen: false,
+  emailComposerOpen: false,
+  emailComposerSending: false,
+  emailComposerItem: null
 };
 const submissionState = {
   inFlight: false
@@ -201,9 +218,14 @@ function wireEvents() {
   elements.refreshBackendBtn.addEventListener("click", bootstrapFromApi);
   elements.queueEmailBtn.addEventListener("click", handleQueueEmail);
   elements.sendEmailBtn.addEventListener("click", handleSendEmail);
+  elements.reviewPendingBtn.addEventListener("click", openPendingReviewModal);
   elements.clearPendingBtn.addEventListener("click", handleClearPending);
   elements.addStudentForm.addEventListener("submit", handleAddStudentSubmit);
   elements.addStudentCloseBtn.addEventListener("click", closeAddStudentModal);
+  elements.pendingReviewCloseBtn.addEventListener("click", closePendingReviewModal);
+  elements.pendingReviewList.addEventListener("click", handlePendingReviewListClick);
+  elements.emailComposerCloseBtn.addEventListener("click", () => closeEmailComposer());
+  elements.emailComposerForm.addEventListener("submit", handleEmailComposerSubmit);
   elements.addThresholdBtn.addEventListener("click", handleAddThreshold);
   elements.saveThresholdsBtn.addEventListener("click", handleSaveThresholds);
   elements.thresholdList.addEventListener("change", handleThresholdEditorChange);
@@ -220,6 +242,16 @@ function wireEvents() {
       closeAddStudentModal();
     }
   });
+  elements.pendingReviewModal.addEventListener("click", (event) => {
+    if (event.target === elements.pendingReviewModal) {
+      closePendingReviewModal();
+    }
+  });
+  elements.emailComposerModal.addEventListener("click", (event) => {
+    if (event.target === elements.emailComposerModal) {
+      closeEmailComposer();
+    }
+  });
   elements.scannerModal.addEventListener("click", (event) => {
     if (event.target === elements.scannerModal) {
       closeScanner();
@@ -228,6 +260,14 @@ function wireEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.scannerModal.hidden) {
       closeScanner();
+      return;
+    }
+    if (event.key === "Escape" && !elements.emailComposerModal.hidden) {
+      closeEmailComposer();
+      return;
+    }
+    if (event.key === "Escape" && !elements.pendingReviewModal.hidden) {
+      closePendingReviewModal();
       return;
     }
     if (event.key === "Escape" && !elements.addStudentModal.hidden) {
@@ -332,11 +372,14 @@ function render() {
   elements.adminUnlockInput.value = state.adminKey;
   elements.queueEmailBtn.disabled = !state.lastStudent;
   elements.sendEmailBtn.disabled = !state.lastStudent || !state.lastStudent.parent_email;
+  elements.reviewPendingBtn.disabled = state.pendingEmails.length === 0;
   updateScanControls();
   renderAddStudentForm();
   renderStudent();
   renderRecentScans();
   renderPendingEmails();
+  renderPendingReviewList();
+  renderEmailComposer();
   renderThresholds();
 }
 
@@ -426,6 +469,57 @@ function renderPendingEmails() {
     </li>
   `).join("");
   elements.pendingEmails.innerHTML = items || `<li><strong>No pending emails.</strong><small>Email-home triggers will appear here.</small></li>`;
+}
+
+function renderPendingReviewList() {
+  const items = state.pendingEmails.map((item, index) => {
+    const pending = normalizePendingEmailItem(item, index);
+    return `
+      <li data-student-id="${escapeAttribute(pending.student_id)}">
+        <div class="review-item-head">
+          <strong>${escapeHtml(pending.name || "Unknown student")}</strong>
+          <span class="review-item-badge">${escapeHtml(pending.tier || "Pending review")}</span>
+        </div>
+        <div class="review-item-meta">
+          <small>${escapeHtml(pending.parent_email || "No parent email on file")}</small>
+          <small>${escapeHtml(String(pending.total_count))} ${escapeHtml(state.incidentPlural || defaultState.incidentPlural)}</small>
+        </div>
+        <small>${escapeHtml(pending.reason || "Queued for parent follow-up.")}</small>
+        <div class="review-item-actions">
+          <button class="ghost" type="button" data-action="view-pending" data-student-id="${escapeAttribute(pending.student_id)}">View</button>
+          <button class="ghost" type="button" data-action="send-pending" data-student-id="${escapeAttribute(pending.student_id)}" ${pending.parent_email ? "" : "disabled"}>Send</button>
+        </div>
+      </li>
+    `;
+  }).join("");
+
+  elements.pendingReviewList.innerHTML = items || `<li><strong>No pending emails.</strong><small>Email-home triggers will appear here.</small></li>`;
+  elements.pendingReviewMessage.textContent = state.pendingEmails.length > 0
+    ? `There ${state.pendingEmails.length === 1 ? "is" : "are"} ${state.pendingEmails.length} pending parent email${state.pendingEmails.length === 1 ? "" : "s"}.`
+    : "Review and send queued parent emails.";
+}
+
+function renderEmailComposer() {
+  const draft = uiState.emailComposerItem;
+  const isSending = uiState.emailComposerSending;
+  elements.emailComposerTo.disabled = isSending;
+  elements.emailComposerSubject.disabled = isSending;
+  elements.emailComposerBody.disabled = isSending;
+  elements.emailComposerSendBtn.disabled = isSending;
+  elements.emailComposerCloseBtn.disabled = isSending;
+
+  if (!draft) {
+    elements.emailComposerForm.reset();
+    elements.emailComposerMessage.textContent = "Review the email before sending it.";
+    return;
+  }
+
+  elements.emailComposerTo.value = draft.to || "";
+  elements.emailComposerSubject.value = draft.subject || "";
+  elements.emailComposerBody.value = draft.body || "";
+  elements.emailComposerMessage.textContent = draft.to
+    ? `Ready to send to ${draft.to}.`
+    : "This student does not have a parent email on file yet.";
 }
 
 function renderThresholds() {
@@ -651,6 +745,82 @@ function normalizeStudentRecord(student = {}) {
   };
 }
 
+function splitStudentName(fullName = "") {
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return { first_name: "", last_name: "" };
+  }
+  if (parts.length === 1) {
+    return { first_name: parts[0], last_name: "" };
+  }
+  return {
+    first_name: parts[0],
+    last_name: parts.slice(1).join(" ")
+  };
+}
+
+function normalizePendingEmailItem(item = {}, index = 0) {
+  const rawName = String(item.name || "").trim();
+  const parsedName = splitStudentName(rawName);
+  const studentId = normalizeStudentIdValue(item.student_id || item.studentId || item.id || `pending-${index + 1}`);
+  const totalCount = Number(item.total_count || item.totalCount || 0);
+  const tier = String(item.tier || item.threshold || "Email Home").trim() || "Email Home";
+  return {
+    student_id: studentId,
+    name: rawName || `${parsedName.first_name} ${parsedName.last_name}`.trim(),
+    first_name: String(item.first_name || parsedName.first_name || "").trim(),
+    last_name: String(item.last_name || parsedName.last_name || "").trim(),
+    parent_email: String(item.parent_email || item.parentEmail || item.email || "").trim(),
+    total_count: Number.isFinite(totalCount) ? totalCount : 0,
+    tier,
+    reason: String(item.reason || "").trim(),
+    status: String(item.status || "pending").trim()
+  };
+}
+
+function buildPendingEmailDraft(item) {
+  const pending = normalizePendingEmailItem(item);
+  const fullName = `${pending.first_name} ${pending.last_name}`.trim() || pending.name || "Student";
+  const totalCount = Number(pending.total_count || 0);
+  const tierTitle = pending.tier || "Email Home";
+  const appTitle = String(state.appTitle || defaultState.appTitle || "Tracker").trim();
+  const schoolName = String(state.schoolName || defaultState.schoolName || "School").trim();
+  const subject = `${fullName} ${appTitle} Notice (${totalCount} total ${state.incidentPlural || defaultState.incidentPlural})`;
+
+  if (/tardy/i.test(appTitle) || /\btard(?:y|ies)\b/i.test(`${state.incidentSingular} ${state.incidentPlural}`)) {
+    const sweepLabel = `${totalCount} tardy sweep${totalCount === 1 ? "" : "s"}`;
+    return {
+      pending,
+      to: pending.parent_email,
+      subject,
+      body: [
+        "Good afternoon,",
+        "",
+        `This message is to inform you that ${fullName} has been caught in ${sweepLabel}.`,
+        `This places them in the ${tierTitle} tier of our tardy tracker.`,
+        "",
+        "Thank you,",
+        `${schoolName} Administration`
+      ].join("\n")
+    };
+  }
+
+  return {
+    pending,
+    to: pending.parent_email,
+    subject,
+    body: [
+      "Good afternoon,",
+      "",
+      `This message is to inform you that ${fullName} has reached ${totalCount} recorded ${state.incidentPlural || defaultState.incidentPlural} in our system.`,
+      `This places them in the ${tierTitle} tier of our ${(appTitle || "tracker").toLowerCase()}.`,
+      "",
+      "Thank you,",
+      `${schoolName} Administration`
+    ].join("\n")
+  };
+}
+
 function normalizeStudentDirectory(directory = {}) {
   return Object.values(directory).reduce((next, student) => {
     const normalized = normalizeStudentRecord(student);
@@ -760,6 +930,41 @@ function closeAddStudentModal(force = false) {
   uiState.addStudentOpen = false;
   elements.addStudentModal.hidden = true;
   document.body.classList.remove("student-entry-open");
+}
+
+function openPendingReviewModal() {
+  uiState.pendingReviewOpen = true;
+  elements.pendingReviewModal.hidden = false;
+  document.body.classList.add("pending-review-open");
+  renderPendingReviewList();
+}
+
+function closePendingReviewModal() {
+  uiState.pendingReviewOpen = false;
+  elements.pendingReviewModal.hidden = true;
+  document.body.classList.remove("pending-review-open");
+}
+
+function openEmailComposer(item) {
+  uiState.emailComposerItem = buildPendingEmailDraft(item);
+  uiState.emailComposerOpen = true;
+  uiState.emailComposerSending = false;
+  elements.emailComposerModal.hidden = false;
+  document.body.classList.add("email-composer-open");
+  renderEmailComposer();
+  elements.emailComposerTo.focus();
+}
+
+function closeEmailComposer(force = false) {
+  if (uiState.emailComposerSending && !force) {
+    return;
+  }
+  uiState.emailComposerOpen = false;
+  uiState.emailComposerSending = false;
+  uiState.emailComposerItem = null;
+  elements.emailComposerModal.hidden = true;
+  document.body.classList.remove("email-composer-open");
+  renderEmailComposer();
 }
 
 function resetAddStudentForm(seedStudentId = "") {
@@ -1054,6 +1259,109 @@ async function handleQueueEmail() {
   showMessage(`Queued parent email for ${state.lastStudent.first_name} ${state.lastStudent.last_name}.`);
 }
 
+function findPendingEmailItem(studentId) {
+  const normalizedId = normalizeStudentIdValue(studentId);
+  return state.pendingEmails.find((item, index) => normalizePendingEmailItem(item, index).student_id === normalizedId) || null;
+}
+
+async function sendPendingEmailItem(item, draft = null) {
+  const emailDraft = draft || buildPendingEmailDraft(item);
+  const pending = emailDraft.pending || normalizePendingEmailItem(item);
+
+  if (!emailDraft.to) {
+    throw new Error("This student does not have a parent email on file.");
+  }
+
+  if (!state.apiBase) {
+    const url = new URL(`mailto:${encodeURIComponent(emailDraft.to)}`);
+    url.searchParams.set("subject", emailDraft.subject);
+    url.searchParams.set("body", emailDraft.body);
+    window.location.href = url.toString();
+    state.pendingEmails = state.pendingEmails.filter((queued, index) => {
+      return normalizePendingEmailItem(queued, index).student_id !== pending.student_id;
+    });
+    persist();
+    render();
+    return;
+  }
+
+  await apiFetch("/api/send-email", {
+    method: "POST",
+    body: JSON.stringify({
+      student: {
+        student_id: pending.student_id,
+        first_name: pending.first_name,
+        last_name: pending.last_name,
+        parent_email: emailDraft.to,
+        total_count: pending.total_count,
+        threshold: { title: pending.tier }
+      },
+      to: emailDraft.to,
+      subject: emailDraft.subject,
+      body: emailDraft.body
+    })
+  }, { admin: true });
+
+  await refreshPendingEmails();
+  persist();
+  render();
+}
+
+function handlePendingReviewListClick(event) {
+  const actionButton = event.target.closest("[data-action][data-student-id]");
+  if (!actionButton) {
+    return;
+  }
+
+  const pendingItem = findPendingEmailItem(actionButton.dataset.studentId);
+  if (!pendingItem) {
+    showMessage("That pending email is no longer in the queue.");
+    return;
+  }
+
+  const action = actionButton.dataset.action;
+  if (action === "view-pending") {
+    openEmailComposer(pendingItem);
+    return;
+  }
+
+  if (action === "send-pending") {
+    sendPendingEmailItem(pendingItem).then(() => {
+      showMessage(`Email sent to ${normalizePendingEmailItem(pendingItem).parent_email}.`);
+    }).catch((error) => {
+      showMessage(error.message);
+    });
+  }
+}
+
+async function handleEmailComposerSubmit(event) {
+  event.preventDefault();
+  if (!uiState.emailComposerItem) {
+    return;
+  }
+
+  uiState.emailComposerSending = true;
+  renderEmailComposer();
+  const draft = {
+    ...uiState.emailComposerItem,
+    to: String(elements.emailComposerTo.value || "").trim(),
+    subject: String(elements.emailComposerSubject.value || "").trim(),
+    body: String(elements.emailComposerBody.value || "").trim()
+  };
+
+  try {
+    await sendPendingEmailItem(uiState.emailComposerItem.pending, draft);
+    closeEmailComposer(true);
+    renderPendingReviewList();
+    showMessage(`Email sent to ${draft.to}.`);
+  } catch (error) {
+    uiState.emailComposerSending = false;
+    renderEmailComposer();
+    elements.emailComposerMessage.textContent = error.message || "Unable to send the email.";
+    showMessage(error.message);
+  }
+}
+
 async function handleSendEmail() {
   if (!state.lastStudent) {
     showMessage("Scan a student before sending an email.");
@@ -1065,18 +1373,24 @@ async function handleSendEmail() {
     return;
   }
 
+  const draft = buildPendingEmailDraft({
+    ...state.lastStudent,
+    name: `${state.lastStudent.first_name} ${state.lastStudent.last_name}`.trim(),
+    total_count: state.lastStudent.total_count || 0,
+    tier: state.lastStudent.threshold && state.lastStudent.threshold.title ? state.lastStudent.threshold.title : "Email Home"
+  });
+
   if (!state.apiBase) {
-    window.location.href = `mailto:${encodeURIComponent(state.lastStudent.parent_email)}`;
+    const url = new URL(`mailto:${encodeURIComponent(draft.to)}`);
+    url.searchParams.set("subject", draft.subject);
+    url.searchParams.set("body", draft.body);
+    window.location.href = url.toString();
     return;
   }
 
   try {
-    await apiFetch("/api/send-email", {
-      method: "POST",
-      body: JSON.stringify({ student: state.lastStudent })
-    }, { admin: true });
-    await refreshPendingEmails();
-    showMessage(`Email sent to ${state.lastStudent.parent_email}.`);
+    await sendPendingEmailItem(draft.pending, draft);
+    showMessage(`Email sent to ${draft.to}.`);
   } catch (error) {
     showMessage(error.message);
   }

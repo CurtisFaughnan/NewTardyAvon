@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Brownsburg High School Lanyard Tracker</title>
-    <link rel="manifest" href="./manifest-brownsburg-high-lanyards.webmanifest?v=20260308m" />
-    <link rel="stylesheet" href="./styles.css?v=20260308m" />
+    <link rel="manifest" href="./manifest-brownsburg-high-lanyards.webmanifest?v=20260312a" />
+    <link rel="stylesheet" href="./styles.css?v=20260312a" />
   </head>
   <body>
     <div class="page-shell">
@@ -150,6 +150,7 @@
             <div class="action-row wrap-row">
               <button id="queueEmailBtn" class="ghost" type="button">Queue email</button>
               <button id="sendEmailBtn" class="ghost" type="button">Send email</button>
+              <button id="reviewPendingBtn" class="ghost" type="button">Review pending</button>
               <button id="clearPendingBtn" class="ghost" type="button">Clear pending</button>
             </div>
           </section>
@@ -250,6 +251,50 @@
       </div>
     </div>
 
+    <div id="pendingReviewModal" class="settings-modal" hidden>
+      <div class="settings-dialog card review-dialog" role="dialog" aria-modal="true" aria-labelledby="pendingReviewTitle">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Follow-up</p>
+            <h2 id="pendingReviewTitle">Pending parent emails</h2>
+          </div>
+          <button id="pendingReviewCloseBtn" class="ghost" type="button">Close</button>
+        </div>
+        <p id="pendingReviewMessage" class="helper">Review and send queued parent emails.</p>
+        <ul id="pendingReviewList" class="data-list review-list"></ul>
+      </div>
+    </div>
+
+    <div id="emailComposerModal" class="settings-modal" hidden>
+      <div class="settings-dialog card review-dialog" role="dialog" aria-modal="true" aria-labelledby="emailComposerTitle">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Parent Email</p>
+            <h2 id="emailComposerTitle">Review email</h2>
+          </div>
+          <button id="emailComposerCloseBtn" class="ghost" type="button">Close</button>
+        </div>
+        <form id="emailComposerForm" class="email-composer-form">
+          <label class="stack-field" for="emailComposerTo">
+            <span>To</span>
+            <input id="emailComposerTo" type="email" autocomplete="off" required />
+          </label>
+          <label class="stack-field" for="emailComposerSubject">
+            <span>Subject</span>
+            <input id="emailComposerSubject" type="text" autocomplete="off" required />
+          </label>
+          <label class="stack-field" for="emailComposerBody">
+            <span>Body</span>
+            <textarea id="emailComposerBody" rows="12" required></textarea>
+          </label>
+          <p id="emailComposerMessage" class="helper">Review the email before sending it.</p>
+          <div class="action-row wrap-row">
+            <button id="emailComposerSendBtn" type="submit">Send email</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script>
       window.LANYARD_APP_CONFIG = {
         profileId: "brownsburg-high-lanyards",
@@ -267,7 +312,7 @@
         ]
       };
     </script>
-    <script src="./vendor/html5-qrcode.min.js?v=20260308m"></script>
-    <script type="module" src="./app.js?v=20260308m"></script>
+    <script src="./vendor/html5-qrcode.min.js?v=20260312a"></script>
+    <script type="module" src="./app.js?v=20260312a"></script>
   </body>
 </html>
