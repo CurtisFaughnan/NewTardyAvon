@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260312a";
+const ASSET_VERSION = "20260419a";
 
 const sampleStudents = {
   "1001": {
@@ -372,7 +372,7 @@ function render() {
   elements.adminUnlockInput.value = state.adminKey;
   elements.queueEmailBtn.disabled = !state.lastStudent;
   elements.sendEmailBtn.disabled = !state.lastStudent || !state.lastStudent.parent_email;
-  elements.reviewPendingBtn.disabled = state.pendingEmails.length === 0;
+  elements.reviewPendingBtn.disabled = false;
   updateScanControls();
   renderAddStudentForm();
   renderStudent();
@@ -932,11 +932,26 @@ function closeAddStudentModal(force = false) {
   document.body.classList.remove("student-entry-open");
 }
 
-function openPendingReviewModal() {
+async function openPendingReviewModal() {
   uiState.pendingReviewOpen = true;
   elements.pendingReviewModal.hidden = false;
   document.body.classList.add("pending-review-open");
   renderPendingReviewList();
+
+  if (!state.apiBase) {
+    return;
+  }
+
+  elements.pendingReviewMessage.textContent = "Checking Google Sheets for pending parent emails...";
+  try {
+    await refreshPendingEmails();
+    persist();
+    renderPendingReviewList();
+  } catch (error) {
+    const message = error.message || "Unable to refresh pending emails.";
+    elements.pendingReviewMessage.textContent = message;
+    showMessage(message);
+  }
 }
 
 function closePendingReviewModal() {
@@ -1189,7 +1204,7 @@ function handleMockScan(studentId) {
     clientEventId: makeClientEventId()
   });
 
-  if (state.emailHomeEnabled && threshold.title.toLowerCase() === "email home") {
+  if (state.emailHomeEnabled && /email\s*home/i.test(threshold.title)) {
     upsertPendingEmailLocal(state.lastStudent, `${threshold.title} reached at ${totalCount} ${state.incidentPlural || defaultState.incidentPlural}.`);
   }
 

@@ -525,20 +525,93 @@ function saveSettings_(patch) {
 }
 
 function getPendingEmails_() {
-  return getRecords_(getSheetName_('pendingEmails'), pendingHeaders_()).sort(function(left, right) {
+  return mergeDerivedPendingEmails_(readPendingEmailRows_()).sort(function(left, right) {
     return String(right.timestamp || '').localeCompare(String(left.timestamp || ''));
-  }).map(function(record) {
-    return {
-      timestamp: String(record.timestamp || ''),
-      student_id: String(record.student_id || ''),
-      name: String(record.name || ''),
-      parent_email: String(record.parent_email || ''),
-      total_count: Number(record.total_count || 0),
-      tier: String(record.tier || ''),
-      reason: String(record.reason || ''),
-      status: String(record.status || 'pending')
-    };
   });
+}
+
+function readPendingEmailRows_() {
+  return getRecords_(getSheetName_('pendingEmails'), pendingHeaders_()).map(normalizePendingEmailRecord_);
+}
+
+function normalizePendingEmailRecord_(record) {
+  return {
+    timestamp: String(record.timestamp || ''),
+    student_id: String(record.student_id || ''),
+    name: String(record.name || ''),
+    parent_email: String(record.parent_email || ''),
+    total_count: Number(record.total_count || 0),
+    tier: String(record.tier || ''),
+    reason: String(record.reason || ''),
+    status: String(record.status || 'pending')
+  };
+}
+
+function mergeDerivedPendingEmails_(pendingRows) {
+  const rows = pendingRows.slice();
+  const existingIds = rows.reduce(function(accumulator, row) {
+    accumulator[normalizeStudentId_(row.student_id)] = true;
+    return accumulator;
+  }, {});
+  const sentRows = getSentEmails_();
+  const studentsById = getStudents_().reduce(function(accumulator, student) {
+    accumulator[normalizeStudentId_(student.student_id)] = student;
+    return accumulator;
+  }, {});
+  const scanGroups = getScanRows_().reduce(function(accumulator, row) {
+    const rawStudentId = String(row.student_id || '').trim();
+    if (!rawStudentId) {
+      return accumulator;
+    }
+
+    const studentId = normalizeStudentId_(rawStudentId);
+    if (!accumulator[studentId]) {
+      accumulator[studentId] = {
+        count: 0,
+        maxScanNumber: 0,
+        latest: null
+      };
+    }
+
+    const group = accumulator[studentId];
+    const scanNumber = Number(row.scan_number || 0);
+    group.count += 1;
+    group.maxScanNumber = Math.max(group.maxScanNumber, Number.isFinite(scanNumber) ? scanNumber : 0);
+    if (!group.latest || String(row.timestamp || '').localeCompare(String(group.latest.timestamp || '')) > 0) {
+      group.latest = row;
+    }
+    return accumulator;
+  }, {});
+  const thresholds = getThresholds_();
+
+  Object.keys(scanGroups).forEach(function(studentId) {
+    if (existingIds[studentId] || hasSentEmailHome_(sentRows, studentId)) {
+      return;
+    }
+
+    const group = scanGroups[studentId];
+    const totalCount = Math.max(group.count, group.maxScanNumber);
+    const emailHomeThreshold = emailHomeThresholdForCount_(thresholds, totalCount);
+    if (!emailHomeThreshold) {
+      return;
+    }
+
+    const latest = group.latest || {};
+    const student = studentsById[studentId] || {};
+    const fullName = String(latest.name || (student.first_name + ' ' + student.last_name) || '').trim();
+    rows.push({
+      timestamp: String(latest.timestamp || new Date().toISOString()),
+      student_id: String(latest.student_id || student.student_id || studentId),
+      name: fullName,
+      parent_email: String(latest.parent_email || student.parent_email || ''),
+      total_count: totalCount,
+      tier: emailHomeThreshold.title || 'Email Home',
+      reason: 'Email Home reached at ' + totalCount + ' ' + getIncidentPlural_() + '.',
+      status: 'pending'
+    });
+  });
+
+  return rows;
 }
 
 function queuePendingEmail_(params) {
@@ -560,7 +633,7 @@ function queuePendingEmail_(params) {
 }
 
 function upsertPendingEmail_(record) {
-  const rows = getPendingEmails_().filter(function(item) {
+  const rows = readPendingEmailRows_().filter(function(item) {
     return normalizeStudentId_(item.student_id) !== normalizeStudentId_(record.student_id);
   });
   rows.unshift(record);
@@ -570,7 +643,7 @@ function upsertPendingEmail_(record) {
 }
 
 function removePendingEmail_(studentId) {
-  const rows = getPendingEmails_().filter(function(item) {
+  const rows = readPendingEmailRows_().filter(function(item) {
     return normalizeStudentId_(item.student_id) !== normalizeStudentId_(studentId);
   });
   overwriteSheet_(getSheetName_('pendingEmails'), pendingHeaders_(), rows.map(function(item) {
@@ -756,7 +829,7 @@ function recordScan_(params) {
   colorScanRow_(appended.sheet, appended.rowIndex, threshold);
 
   let pendingEmailQueued = false;
-  if (toBoolean_(settings.email_home_enabled) && String(threshold.title).trim().toLowerCase() === 'email home') {
+  if (toBoolean_(settings.email_home_enabled) && isEmailHomeTitle_(threshold.title) && !hasSentEmailHome_(getSentEmails_(), student.student_id)) {
     pendingEmailQueued = true;
     upsertPendingEmail_({
       timestamp: timestamp,
@@ -816,6 +889,25 @@ function thresholdForCount_(thresholds, totalCount) {
   return thresholds.find(function(threshold) {
     return totalCount >= Number(threshold.min) && totalCount <= Number(threshold.max);
   }) || thresholds[thresholds.length - 1];
+}
+
+function isEmailHomeTitle_(title) {
+  return /email\s*home/i.test(String(title || ''));
+}
+
+function emailHomeThresholdForCount_(thresholds, totalCount) {
+  return thresholds.filter(function(threshold) {
+    return isEmailHomeTitle_(threshold.title) && totalCount >= Number(threshold.min || 0);
+  }).sort(function(left, right) {
+    return Number(right.min || 0) - Number(left.min || 0);
+  })[0] || null;
+}
+
+function hasSentEmailHome_(sentRows, studentId) {
+  const normalizedId = normalizeStudentId_(studentId);
+  return sentRows.some(function(row) {
+    return normalizeStudentId_(row.student_id) === normalizedId && isEmailHomeTitle_(row.tier || row.subject);
+  });
 }
 
 function colorScanRow_(sheet, rowIndex, threshold) {
