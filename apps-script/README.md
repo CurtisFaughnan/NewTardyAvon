@@ -26,6 +26,9 @@ You can override it later with a Script Property named `SHEET_ID` if needed.
    - `ADMIN_KEY`: choose a new admin key
    - optional `SHEET_ID`: only if you want to override the default
    - optional `SCHOOL_NAME`
+   - optional `APP_TITLE`: use `Tardy Tracker` for tardy deployments
+   - optional `STUDENTS_SHEET_NAME`: use `Students` if your student tab is named `Students`
+   - optional `SCANS_SHEET_NAME`: use `scan_log` if your scan tab is named `scan_log`
 6. Click `Deploy > New deployment`.
 7. Select `Web app`.
 8. Set `Execute as` to `Me`.
@@ -38,4 +41,5 @@ You can override it later with a Script Property named `SHEET_ID` if needed.
 
 - The frontend was updated to detect a Google Apps Script `/exec` URL automatically.
 - The default admin key in `Code.gs` is still the old desktop value for compatibility. Change it in Script Properties.
+- Tardy deployments automatically default to `Students` and `scan_log` when `APP_TITLE` or incident labels contain `Tardy`.
 - Email sending uses `MailApp`, so your daily quota depends on your Google account type.

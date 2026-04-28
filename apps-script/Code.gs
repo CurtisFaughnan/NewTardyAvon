@@ -13,6 +13,14 @@ const SHEET_DEFAULTS = {
   sentEmails: 'Sent_Emails',
   settings: 'App_Settings'
 };
+const TARDY_SHEET_DEFAULTS = {
+  students: 'Students',
+  scans: 'scan_log',
+  thresholds: 'Thresholds',
+  pendingEmails: 'Pending_Emails',
+  sentEmails: 'Sent_Emails',
+  settings: 'App_Settings'
+};
 const SHEET_PROPERTY_KEYS = {
   students: 'STUDENTS_SHEET_NAME',
   scans: 'SCANS_SHEET_NAME',
@@ -236,7 +244,18 @@ function getSheetName_(key) {
     throw new Error('Unknown sheet key: ' + key);
   }
 
-  return PropertiesService.getScriptProperties().getProperty(propertyKey) || SHEET_DEFAULTS[key];
+  return PropertiesService.getScriptProperties().getProperty(propertyKey) || getDefaultSheetName_(key);
+}
+
+function getDefaultSheetName_(key) {
+  if (isTardyTracker_()) {
+    return TARDY_SHEET_DEFAULTS[key] || SHEET_DEFAULTS[key];
+  }
+  return SHEET_DEFAULTS[key];
+}
+
+function isTardyTracker_() {
+  return /tardy/i.test(getAppTitle_() + ' ' + getIncidentSingular_() + ' ' + getIncidentPlural_());
 }
 
 function getOrCreateSheet_(name, headers) {
@@ -769,7 +788,12 @@ function refreshDailyHighlights_() {
   const backgrounds = values.map(function(row) {
     const record = {};
     headers.forEach(function(header, index) {
-      record[header] = row[index];
+      const value = row[index];
+      const canonicalHeader = canonicalHeaderName_(header);
+      record[header] = value;
+      if (canonicalHeader) {
+        record[canonicalHeader] = value;
+      }
     });
 
     const totalCount = Number(record.scan_number || 0);
@@ -881,6 +905,8 @@ function recordScan_(params) {
     clientEventId
   ]);
   colorScanRow_(appended.sheet, appended.rowIndex, threshold);
+  refreshDailyHighlights_();
+  PropertiesService.getScriptProperties().setProperty('LAST_DAILY_HIGHLIGHT_RESET', today);
 
   let pendingEmailQueued = false;
   if (toBoolean_(settings.email_home_enabled) && isEmailHomeTitle_(threshold.title) && !hasSentEmailHome_(getSentEmails_(), student.student_id)) {
