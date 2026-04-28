@@ -194,6 +194,42 @@ function getProgramLabel_() {
   return label || 'Student Tracker';
 }
 
+function normalizeHeaderName_(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function canonicalHeaderName_(header) {
+  const normalized = normalizeHeaderName_(header);
+  const aliases = {
+    student_id: ['studentid', 'studentnumber', 'studentno', 'id'],
+    first_name: ['firstname', 'fname', 'first'],
+    last_name: ['lastname', 'lname', 'last'],
+    class_year: ['classyear', 'gradeyear', 'grade', 'year'],
+    team: ['teamname', 'team'],
+    parent_email: ['parentemail', 'guardianemail', 'parentguardianemail', 'email', 'emailaddress'],
+    scan_number: ['scannumber', 'scancount', 'totalcount', 'count'],
+    device_name: ['devicename', 'device'],
+    scan_date: ['scandate', 'date'],
+    client_event_id: ['clienteventid', 'eventid']
+  };
+
+  if (!normalized) {
+    return '';
+  }
+
+  for (var canonical in aliases) {
+    if (normalizeHeaderName_(canonical) === normalized || aliases[canonical].indexOf(normalized) !== -1) {
+      return canonical;
+    }
+  }
+
+  if (normalized.indexOf('email') !== -1) {
+    return 'parent_email';
+  }
+
+  return String(header || '').trim();
+}
+
 function getSheetName_(key) {
   const propertyKey = SHEET_PROPERTY_KEYS[key];
   if (!propertyKey) {
@@ -242,7 +278,18 @@ function getRecords_(sheetName, headers) {
   return values.map(function(row) {
     const record = {};
     headerValues.forEach(function(header, index) {
-      record[String(header || '').trim()] = row[index];
+      const rawHeader = String(header || '').trim();
+      const canonicalHeader = canonicalHeaderName_(rawHeader);
+      if (rawHeader) {
+        record[rawHeader] = row[index];
+      }
+      if (canonicalHeader) {
+        const hasExistingValue = String(record[canonicalHeader] || '').trim() !== '';
+        const hasNextValue = String(row[index] || '').trim() !== '';
+        if (!hasExistingValue || hasNextValue) {
+          record[canonicalHeader] = row[index];
+        }
+      }
     });
     return record;
   }).filter(function(record) {
@@ -325,7 +372,14 @@ function getStudentSheetHeaders_() {
 }
 
 function normalizeStudentId_(value) {
-  const normalized = String(value || '').trim().replace(/^0+/, '');
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+  if (/^\d+(\.0+)?$/.test(raw)) {
+    return String(parseInt(raw, 10));
+  }
+  const normalized = raw.replace(/^0+/, '');
   return normalized || '0';
 }
 
@@ -356,9 +410,9 @@ function sanitizeStudentInput_(student) {
     student_id: String(student.student_id || student.studentId || '').trim().replace(/^0+/, ''),
     first_name: String(student.first_name || student.firstName || '').trim(),
     last_name: String(student.last_name || student.lastName || '').trim(),
-    class_year: String(student.class_year || student.classYear || '').trim(),
+    class_year: String(student.class_year || student.classYear || student.grade || '').trim(),
     team: String(student.team || '').trim(),
-    parent_email: String(student.parent_email || student.parentEmail || '').trim()
+    parent_email: String(student.parent_email || student.parentEmail || student.email || '').trim()
   };
 
   if (!normalized.student_id) {
@@ -381,7 +435,7 @@ function sanitizeStudentInput_(student) {
 }
 
 function studentValueForHeader_(student, header) {
-  switch (String(header || '').trim()) {
+  switch (canonicalHeaderName_(header)) {
     case 'student_id':
       return student.student_id;
     case 'first_name':
@@ -412,7 +466,7 @@ function addStudent_(student) {
     return String(header || '').trim();
   });
   const missingHeaders = ['student_id', 'first_name', 'last_name', 'class_year'].filter(function(header) {
-    return headers.indexOf(header) === -1;
+    return headers.map(canonicalHeaderName_).indexOf(header) === -1;
   });
   if (missingHeaders.length > 0) {
     throw new Error('Students sheet is missing required columns: ' + missingHeaders.join(', '));

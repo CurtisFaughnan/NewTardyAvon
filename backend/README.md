@@ -36,6 +36,7 @@ Any Node host that supports environment variables works. A common split is:
 - `GET /api/health`
 - `GET /api/bootstrap`
 - `GET /api/students/:studentId`
+- `POST /api/students` (admin)
 - `POST /api/scans`
 - `GET /api/pending-emails`
 - `POST /api/pending-emails`

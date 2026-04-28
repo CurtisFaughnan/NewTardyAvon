@@ -19,8 +19,59 @@ const SHEET_HEADERS = {
 
 let spreadsheetIdPromise;
 
+const HEADER_ALIASES = {
+  student_id: ["studentid", "studentnumber", "studentno", "id"],
+  first_name: ["firstname", "fname", "first"],
+  last_name: ["lastname", "lname", "last"],
+  class_year: ["classyear", "gradeyear", "grade", "year"],
+  team: ["teamname", "team"],
+  parent_email: ["parentemail", "guardianemail", "parentguardianemail", "email", "emailaddress"],
+  scan_number: ["scannumber", "scancount", "totalcount", "count"],
+  device_name: ["devicename", "device"],
+  scan_date: ["scandate", "date"],
+  client_event_id: ["clienteventid", "eventid"]
+};
+
+function normalizeHeaderName(value) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function canonicalHeaderName(header) {
+  const normalized = normalizeHeaderName(header);
+  if (!normalized) {
+    return "";
+  }
+
+  for (const [canonical, aliases] of Object.entries(HEADER_ALIASES)) {
+    if (normalizeHeaderName(canonical) === normalized || aliases.includes(normalized)) {
+      return canonical;
+    }
+  }
+
+  if (normalized.includes("email")) {
+    return "parent_email";
+  }
+
+  return String(header ?? "").trim();
+}
+
+function makeHttpError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
 function normalizeStudentId(value) {
-  return String(value ?? "").trim().replace(/^0+/, "") || "0";
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  if (/^\d+(\.0+)?$/.test(raw)) {
+    return String(Number.parseInt(raw, 10));
+  }
+
+  return raw.replace(/^0+/, "") || "0";
 }
 
 function todayKey() {
@@ -149,7 +200,19 @@ async function getRows(sheetName, headerRow) {
   return rows.slice(1).map((row) => {
     const record = {};
     headers.forEach((header, index) => {
-      record[header] = row[index] ?? "";
+      const value = row[index] ?? "";
+      const rawHeader = String(header ?? "").trim();
+      const canonicalHeader = canonicalHeaderName(rawHeader);
+      if (rawHeader) {
+        record[rawHeader] = value;
+      }
+      if (canonicalHeader) {
+        const hasExistingValue = String(record[canonicalHeader] ?? "").trim() !== "";
+        const hasNextValue = String(value ?? "").trim() !== "";
+        if (!hasExistingValue || hasNextValue) {
+          record[canonicalHeader] = value;
+        }
+      }
     });
     return record;
   });
@@ -180,14 +243,106 @@ async function appendRow(sheetName, headerRow, row) {
   });
 }
 
+async function getSheetHeaders(sheetName, fallbackHeaders) {
+  const { sheets } = await getApis();
+  const spreadsheetId = await resolveSpreadsheetId();
+  await ensureSheet(sheetName, fallbackHeaders);
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!A1:Z1`
+  });
+  const headers = ((response.data.values || [])[0] || []).map((header) => String(header || "").trim());
+  return headers.some(Boolean) ? headers : fallbackHeaders.slice();
+}
+
 async function getStudents() {
-  return getRows(config.studentSheet, SHEET_HEADERS.student);
+  const rows = await getRows(config.studentSheet, SHEET_HEADERS.student);
+  return rows.map((student) => ({
+    ...student,
+    student_id: String(student.student_id || ""),
+    first_name: String(student.first_name || ""),
+    last_name: String(student.last_name || ""),
+    class_year: String(student.class_year || ""),
+    team: String(student.team || ""),
+    parent_email: String(student.parent_email || "")
+  }));
 }
 
 async function getStudentById(studentId) {
   const target = normalizeStudentId(studentId);
   const students = await getStudents();
   return students.find((student) => normalizeStudentId(student.student_id) === target) || null;
+}
+
+function sanitizeStudentInput(student = {}) {
+  const normalized = {
+    student_id: normalizeStudentId(student.student_id || student.studentId || student.id || ""),
+    first_name: String(student.first_name || student.firstName || "").trim(),
+    last_name: String(student.last_name || student.lastName || "").trim(),
+    class_year: String(student.class_year || student.classYear || student.grade || "").trim(),
+    team: String(student.team || "").trim(),
+    parent_email: String(student.parent_email || student.parentEmail || student.email || "").trim()
+  };
+
+  if (!normalized.student_id) {
+    throw makeHttpError("Student ID is required.");
+  }
+  if (!normalized.first_name) {
+    throw makeHttpError("First name is required.");
+  }
+  if (!normalized.last_name) {
+    throw makeHttpError("Last name is required.");
+  }
+  if (!normalized.class_year) {
+    throw makeHttpError("Class year is required.");
+  }
+  if (normalized.parent_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized.parent_email)) {
+    throw makeHttpError("Parent email must be valid or blank.");
+  }
+
+  return normalized;
+}
+
+function studentValueForHeader(student, header) {
+  switch (canonicalHeaderName(header)) {
+    case "student_id":
+      return student.student_id;
+    case "first_name":
+      return student.first_name;
+    case "last_name":
+      return student.last_name;
+    case "class_year":
+      return student.class_year;
+    case "team":
+      return student.team;
+    case "parent_email":
+      return student.parent_email;
+    default:
+      return "";
+  }
+}
+
+async function addStudent(student) {
+  const sanitized = sanitizeStudentInput(student);
+  const existing = await getStudentById(sanitized.student_id);
+  if (existing) {
+    throw makeHttpError("A student with that ID already exists.", 409);
+  }
+
+  const headers = await getSheetHeaders(config.studentSheet, SHEET_HEADERS.student);
+  const canonicalHeaders = headers.map(canonicalHeaderName);
+  const missingHeaders = ["student_id", "first_name", "last_name", "class_year"].filter((header) => !canonicalHeaders.includes(header));
+  if (missingHeaders.length > 0) {
+    throw makeHttpError(`Students sheet is missing required columns: ${missingHeaders.join(", ")}`);
+  }
+
+  await appendRow(
+    config.studentSheet,
+    SHEET_HEADERS.student,
+    headers.map((header) => studentValueForHeader(sanitized, header))
+  );
+
+  return sanitized;
 }
 
 async function getThresholds() {
@@ -413,6 +568,7 @@ async function appendSentEmail(record) {
 
 module.exports = {
   DEFAULT_THRESHOLDS,
+  addStudent,
   config,
   clearPendingEmails,
   getPendingEmails,

@@ -2,6 +2,7 @@ const cors = require("cors");
 const express = require("express");
 const { config } = require("./config");
 const {
+  addStudent,
   appendSentEmail,
   clearPendingEmails,
   getPendingEmails,
@@ -78,6 +79,15 @@ app.get("/api/students/:studentId", async (req, res, next) => {
       return;
     }
     res.json(student);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/students", requireAdmin, async (req, res, next) => {
+  try {
+    const student = req.body.student || req.body;
+    res.status(201).json(await addStudent(student));
   } catch (error) {
     next(error);
   }

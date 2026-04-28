@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260419a";
+const ASSET_VERSION = "20260428a";
 
 const sampleStudents = {
   "1001": {
@@ -79,7 +79,7 @@ const defaultState = {
   countLabel: RUNTIME_CONFIG.countLabel,
   incidentSingular: RUNTIME_CONFIG.incidentSingular,
   incidentPlural: RUNTIME_CONFIG.incidentPlural,
-  apiBase: "",
+  apiBase: sanitizeBaseUrl(RUNTIME_CONFIG.defaultApiBase || ""),
   adminKey: "",
   backendConnected: false,
   currentSection: 1,
@@ -703,6 +703,7 @@ function normalizeStoredState(nextState) {
     countLabel: String(nextState.countLabel || defaultState.countLabel),
     incidentSingular: String(nextState.incidentSingular || defaultState.incidentSingular),
     incidentPlural: String(nextState.incidentPlural || defaultState.incidentPlural),
+    apiBase: sanitizeBaseUrl(nextState.apiBase || defaultState.apiBase),
     localStudents: normalizeStudentDirectory(nextState.localStudents || {}),
     thresholds: normalizeThresholds(nextState.thresholds || defaultState.thresholds),
     scannedKeys: pruneScannedKeys(nextState.scannedKeys)
@@ -741,7 +742,7 @@ function normalizeStudentRecord(student = {}) {
     last_name: String(student.last_name || student.lastName || "").trim(),
     class_year: String(student.class_year || student.classYear || "").trim(),
     team: String(student.team || "").trim(),
-    parent_email: String(student.parent_email || student.parentEmail || "").trim()
+    parent_email: String(student.parent_email || student.parentEmail || student.email || "").trim()
   };
 }
 
@@ -1889,6 +1890,7 @@ function resolveRuntimeConfig() {
       countLabel: "Total violations",
       incidentSingular: "violation",
       incidentPlural: "violations",
+      defaultApiBase: "",
       showTeam: true,
       defaultThresholds: clone(DEFAULT_APP_THRESHOLDS)
     };
@@ -1906,6 +1908,7 @@ function resolveRuntimeConfig() {
     countLabel: String(inlineConfig.countLabel || profileConfig.countLabel || "Total violations"),
     incidentSingular: String(inlineConfig.incidentSingular || profileConfig.incidentSingular || "violation"),
     incidentPlural: String(inlineConfig.incidentPlural || profileConfig.incidentPlural || "violations"),
+    defaultApiBase: sanitizeBaseUrl(inlineConfig.defaultApiBase || profileConfig.defaultApiBase || ""),
     showTeam: typeof inlineConfig.showTeam === "boolean"
       ? inlineConfig.showTeam
       : (typeof profileConfig.showTeam === "boolean" ? profileConfig.showTeam : true),
