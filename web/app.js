@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260428b";
+const ASSET_VERSION = "20260428c";
 
 const sampleStudents = {
   "1001": {
@@ -703,11 +703,20 @@ function normalizeStoredState(nextState) {
     countLabel: String(nextState.countLabel || defaultState.countLabel),
     incidentSingular: String(nextState.incidentSingular || defaultState.incidentSingular),
     incidentPlural: String(nextState.incidentPlural || defaultState.incidentPlural),
-    apiBase: sanitizeBaseUrl(nextState.apiBase || defaultState.apiBase),
+    apiBase: resolveStoredApiBase(nextState.apiBase),
     localStudents: normalizeStudentDirectory(nextState.localStudents || {}),
     thresholds: normalizeThresholds(nextState.thresholds || defaultState.thresholds),
     scannedKeys: pruneScannedKeys(nextState.scannedKeys)
   };
+}
+
+function resolveStoredApiBase(storedApiBase) {
+  const saved = sanitizeBaseUrl(storedApiBase || "");
+  const configuredDefault = sanitizeBaseUrl(defaultState.apiBase || "");
+  if (RUNTIME_CONFIG.profileId === "avon-tardies" && configuredDefault) {
+    return configuredDefault;
+  }
+  return saved || configuredDefault;
 }
 
 function formatRecentScanIdentity(scan) {
