@@ -62,6 +62,15 @@ button.ghost {
   color: var(--ink);
 }
 
+button.danger-button {
+  background: rgba(190, 43, 43, 0.12);
+  color: #8f1f1f;
+}
+
+button.danger-button:hover {
+  background: rgba(190, 43, 43, 0.18);
+}
+
 button:disabled {
   opacity: 0.52;
   cursor: default;

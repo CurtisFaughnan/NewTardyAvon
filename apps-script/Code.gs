@@ -106,6 +106,17 @@ function routeRequest_(request) {
       assertAdmin_(request);
       clearSheetData_(getSheetName_('pendingEmails'), pendingHeaders_());
       return { ok: true };
+    case 'pending-emails/delete':
+      assertMethod_(request, 'POST');
+      assertAdmin_(request);
+      removePendingEmail_(request.params.studentId || request.params.student_id || request.params.id || '');
+      return { ok: true };
+    case 'scans/repair-highlights':
+      assertMethod_(request, 'POST');
+      assertAdmin_(request);
+      refreshDailyHighlights_();
+      PropertiesService.getScriptProperties().setProperty('LAST_DAILY_HIGHLIGHT_RESET', todayKey_());
+      return { ok: true };
     case 'send-email':
       assertMethod_(request, 'POST');
       assertAdmin_(request);
@@ -798,9 +809,7 @@ function refreshDailyHighlights_() {
 
     const totalCount = Number(record.scan_number || 0);
     const isToday = readScanDate_(record) === today;
-    const hex = isToday && totalCount > 0
-      ? ((thresholdForCount_(thresholds, totalCount).hex) || white)
-      : white;
+    const hex = isToday && totalCount > 0 ? getThresholdHex_(thresholdForCount_(thresholds, totalCount)) : white;
 
     return Array(columnCount).fill(hex);
   });
@@ -991,8 +1000,21 @@ function hasSentEmailHome_(sentRows, studentId) {
 }
 
 function colorScanRow_(sheet, rowIndex, threshold) {
-  const hex = threshold.hex || rgbToHex_(threshold.color || [1, 1, 1]);
-  sheet.getRange(rowIndex, 1, 1, Math.max(sheet.getLastColumn(), scanHeaders_().length)).setBackground(hex);
+  const columnCount = Math.max(sheet.getLastColumn(), scanHeaders_().length);
+  const hex = getThresholdHex_(threshold);
+  sheet.getRange(rowIndex, 1, 1, columnCount).setBackgrounds([Array(columnCount).fill(hex)]);
+  SpreadsheetApp.flush();
+}
+
+function getThresholdHex_(threshold) {
+  if (!threshold) {
+    return '#ffffff';
+  }
+  const explicitHex = String(threshold.hex || '').trim();
+  if (/^#?[0-9a-fA-F]{6}$/.test(explicitHex)) {
+    return explicitHex.charAt(0) === '#' ? explicitHex.toLowerCase() : ('#' + explicitHex.toLowerCase());
+  }
+  return rgbToHex_(threshold.color || [1, 1, 1]);
 }
 
 function startNewSection_() {

@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260428d";
+const ASSET_VERSION = "20260428e";
 
 const sampleStudents = {
   "1001": {
@@ -488,6 +488,7 @@ function renderPendingReviewList() {
         <div class="review-item-actions">
           <button class="ghost" type="button" data-action="view-pending" data-student-id="${escapeAttribute(pending.student_id)}">View</button>
           <button class="ghost" type="button" data-action="send-pending" data-student-id="${escapeAttribute(pending.student_id)}" ${pending.parent_email ? "" : "disabled"}>Send</button>
+          <button class="ghost danger-button" type="button" data-action="delete-pending" data-student-id="${escapeAttribute(pending.student_id)}">Delete</button>
         </div>
       </li>
     `;
@@ -1356,7 +1357,38 @@ function handlePendingReviewListClick(event) {
     }).catch((error) => {
       showMessage(error.message);
     });
+    return;
   }
+
+  if (action === "delete-pending") {
+    deletePendingEmailItem(pendingItem).then(() => {
+      showMessage("Pending email deleted.");
+    }).catch((error) => {
+      showMessage(error.message);
+    });
+  }
+}
+
+async function deletePendingEmailItem(item) {
+  const pending = normalizePendingEmailItem(item);
+  if (!pending.student_id) {
+    throw new Error("That pending email is missing a student ID.");
+  }
+
+  if (state.apiBase) {
+    await apiFetch("/api/pending-emails/delete", {
+      method: "POST",
+      body: JSON.stringify({ studentId: pending.student_id })
+    }, { admin: true });
+    await refreshPendingEmails();
+  } else {
+    state.pendingEmails = state.pendingEmails.filter((queued, index) => {
+      return normalizePendingEmailItem(queued, index).student_id !== pending.student_id;
+    });
+  }
+
+  persist();
+  render();
 }
 
 async function handleEmailComposerSubmit(event) {

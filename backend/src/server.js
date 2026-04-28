@@ -160,6 +160,15 @@ app.post("/api/pending-emails/clear", requireAdmin, async (req, res, next) => {
   }
 });
 
+app.post("/api/pending-emails/delete", requireAdmin, async (req, res, next) => {
+  try {
+    await removePendingEmail(req.body.studentId || req.body.student_id || req.body.id);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.delete("/api/pending-emails/:studentId", requireAdmin, async (req, res, next) => {
   try {
     await removePendingEmail(req.params.studentId);
