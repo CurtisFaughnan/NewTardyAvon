@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260428g";
+const ASSET_VERSION = "20260428h";
 
 const sampleStudents = {
   "1001": {
@@ -714,7 +714,7 @@ function normalizeStoredState(nextState) {
 function resolveStoredApiBase(storedApiBase) {
   const saved = sanitizeBaseUrl(storedApiBase || "");
   const configuredDefault = sanitizeBaseUrl(defaultState.apiBase || "");
-  if (RUNTIME_CONFIG.profileId === "avon-tardies" && configuredDefault) {
+  if (RUNTIME_CONFIG.forceDefaultApiBase && configuredDefault) {
     return configuredDefault;
   }
   return saved || configuredDefault;
@@ -1932,6 +1932,7 @@ function resolveRuntimeConfig() {
       incidentSingular: "violation",
       incidentPlural: "violations",
       defaultApiBase: "",
+      forceDefaultApiBase: false,
       showTeam: true,
       defaultThresholds: clone(DEFAULT_APP_THRESHOLDS)
     };
@@ -1950,6 +1951,9 @@ function resolveRuntimeConfig() {
     incidentSingular: String(inlineConfig.incidentSingular || profileConfig.incidentSingular || "violation"),
     incidentPlural: String(inlineConfig.incidentPlural || profileConfig.incidentPlural || "violations"),
     defaultApiBase: sanitizeBaseUrl(inlineConfig.defaultApiBase || profileConfig.defaultApiBase || ""),
+    forceDefaultApiBase: typeof inlineConfig.forceDefaultApiBase === "boolean"
+      ? inlineConfig.forceDefaultApiBase
+      : Boolean(profileConfig.forceDefaultApiBase),
     showTeam: typeof inlineConfig.showTeam === "boolean"
       ? inlineConfig.showTeam
       : (typeof profileConfig.showTeam === "boolean" ? profileConfig.showTeam : true),
