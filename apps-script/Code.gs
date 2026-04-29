@@ -332,6 +332,7 @@ function getRecords_(sheetName, headers) {
 function appendRow_(sheetName, headers, row) {
   const sheet = getOrCreateSheet_(sheetName, headers);
   sheet.appendRow(row);
+  SpreadsheetApp.flush();
   return {
     sheet: sheet,
     rowIndex: sheet.getLastRow()
@@ -815,6 +816,7 @@ function refreshDailyHighlights_() {
   });
 
   sheet.getRange(2, 1, values.length, columnCount).setBackgrounds(backgrounds);
+  SpreadsheetApp.flush();
 }
 
 function runDailyHighlightReset() {
@@ -913,8 +915,7 @@ function recordScan_(params) {
     today,
     clientEventId
   ]);
-  colorScanRow_(appended.sheet, appended.rowIndex, threshold);
-  refreshDailyHighlights_();
+  const appliedColor = colorScanRow_(appended.sheet, appended.rowIndex, threshold);
   PropertiesService.getScriptProperties().setProperty('LAST_DAILY_HIGHLIGHT_RESET', today);
 
   let pendingEmailQueued = false;
@@ -941,7 +942,9 @@ function recordScan_(params) {
       timestamp: timestamp,
       section: currentSection,
       synced: true,
-      client_event_id: clientEventId
+      client_event_id: clientEventId,
+      row_index: appended.rowIndex,
+      sheet_color: appliedColor
     }
   };
 }
@@ -1004,6 +1007,7 @@ function colorScanRow_(sheet, rowIndex, threshold) {
   const hex = getThresholdHex_(threshold);
   sheet.getRange(rowIndex, 1, 1, columnCount).setBackgrounds([Array(columnCount).fill(hex)]);
   SpreadsheetApp.flush();
+  return hex;
 }
 
 function getThresholdHex_(threshold) {
