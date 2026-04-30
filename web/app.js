@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260428h";
+const ASSET_VERSION = "20260430a";
 
 const sampleStudents = {
   "1001": {
