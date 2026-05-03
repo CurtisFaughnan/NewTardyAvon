@@ -44,7 +44,8 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260430a";
+const ASSET_VERSION = "20260503a";
+const APPS_SCRIPT_JSONP_TIMEOUT_MS = 20000;
 
 const sampleStudents = {
   "1001": {
@@ -1874,9 +1875,7 @@ async function apiFetchAppsScript(path, options = {}, { admin = false } = {}) {
       });
     }
   } catch (error) {
-    const networkError = new Error("Unable to reach the Apps Script backend.");
-    networkError.retriable = true;
-    throw networkError;
+    return apiFetchAppsScriptJsonp(endpoint, method, payload);
   }
 
   const text = await response.text();
@@ -1888,6 +1887,61 @@ async function apiFetchAppsScript(path, options = {}, { admin = false } = {}) {
     throw requestError;
   }
   return data;
+}
+
+function apiFetchAppsScriptJsonp(endpoint, method, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `__lanyardJsonp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const script = document.createElement("script");
+    const url = new URL(state.apiBase);
+    const jsonpPayload = { endpoint, _method: method, ...payload };
+    let settled = false;
+
+    function cleanup() {
+      settled = true;
+      delete window[callbackName];
+      script.remove();
+    }
+
+    const timeout = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      cleanup();
+      const networkError = new Error("Unable to reach the Apps Script backend.");
+      networkError.retriable = true;
+      reject(networkError);
+    }, APPS_SCRIPT_JSONP_TIMEOUT_MS);
+
+    window[callbackName] = (data) => {
+      if (settled) {
+        return;
+      }
+      window.clearTimeout(timeout);
+      cleanup();
+      if (data && data.error) {
+        reject(new Error(data.error));
+        return;
+      }
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      if (settled) {
+        return;
+      }
+      window.clearTimeout(timeout);
+      cleanup();
+      const networkError = new Error("Unable to reach the Apps Script backend.");
+      networkError.retriable = true;
+      reject(networkError);
+    };
+
+    url.searchParams.set("callback", callbackName);
+    url.searchParams.set("payload", JSON.stringify(jsonpPayload));
+    script.src = url.toString();
+    document.head.appendChild(script);
+  });
 }
 
 function safeJsonParse(text, fallback = {}) {

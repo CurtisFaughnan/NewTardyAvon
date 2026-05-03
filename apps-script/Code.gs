@@ -50,13 +50,14 @@ function doPost(e) {
 }
 
 function handleRequest_(e, method) {
+  var request;
   try {
-    const request = parseRequest_(e, method);
+    request = parseRequest_(e, method);
     maintainScanSheet_(request);
     const data = routeRequest_(request);
-    return jsonResponse_(data);
+    return jsonResponse_(data, request.callback);
   } catch (error) {
-    return jsonResponse_({ error: error.message || 'Unexpected Apps Script error.' });
+    return jsonResponse_({ error: error.message || 'Unexpected Apps Script error.' }, request && request.callback);
   }
 }
 
@@ -65,12 +66,15 @@ function parseRequest_(e, method) {
   const rawBody = e && e.postData && e.postData.contents ? safeJsonParse_(e.postData.contents, {}) : {};
   const params = Object.assign({}, (e && e.parameter) || {}, rawBody, parameterPayload);
   const endpoint = String(params.endpoint || 'health').replace(/^\/+/, '').replace(/^api\//, '');
+  const callback = sanitizeJsonpCallback_(params.callback || '');
+  const effectiveMethod = String(params._method || method || 'GET').toUpperCase();
 
   return {
-    method: method,
+    method: effectiveMethod,
     endpoint: endpoint,
     params: params,
-    adminKey: params.adminKey || ''
+    adminKey: params.adminKey || '',
+    callback: callback
   };
 }
 
@@ -1103,8 +1107,19 @@ function buildParentEmail_(student, totalCount, tierTitle) {
   };
 }
 
-function jsonResponse_(payload) {
-  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+function jsonResponse_(payload, callback) {
+  const json = JSON.stringify(payload);
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + '(' + json + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+
+function sanitizeJsonpCallback_(value) {
+  const callback = String(value || '').trim();
+  return /^[A-Za-z_$][0-9A-Za-z_$]*(\.[A-Za-z_$][0-9A-Za-z_$]*)*$/.test(callback) ? callback : '';
 }
 
 function safeJsonParse_(value, fallback) {
