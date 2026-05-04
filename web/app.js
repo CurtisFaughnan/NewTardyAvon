@@ -44,7 +44,7 @@ const PROFILE_CONFIGS = {
 const RUNTIME_CONFIG = resolveRuntimeConfig();
 const STORAGE_KEY = `lanyard-mobile-shell-v3:${RUNTIME_CONFIG.profileId}`;
 const MAX_RECENT_SCANS = 12;
-const ASSET_VERSION = "20260503a";
+const ASSET_VERSION = "20260503b";
 const APPS_SCRIPT_JSONP_TIMEOUT_MS = 20000;
 
 const sampleStudents = {
@@ -1854,39 +1854,7 @@ async function apiFetchAppsScript(path, options = {}, { admin = false } = {}) {
     payload.adminKey = state.adminKey;
   }
 
-  let response;
-  try {
-    if (method === "GET") {
-      const url = new URL(state.apiBase);
-      url.searchParams.set("endpoint", endpoint);
-      for (const [key, value] of Object.entries(payload)) {
-        if (value === null || typeof value === "undefined" || typeof value === "object") {
-          continue;
-        }
-        url.searchParams.set(key, String(value));
-      }
-      response = await fetch(url.toString(), { method: "GET" });
-    } else {
-      const form = new URLSearchParams();
-      form.set("payload", JSON.stringify({ endpoint, ...payload }));
-      response = await fetch(state.apiBase, {
-        method: "POST",
-        body: form
-      });
-    }
-  } catch (error) {
-    return apiFetchAppsScriptJsonp(endpoint, method, payload);
-  }
-
-  const text = await response.text();
-  const data = safeJsonParse(text, {});
-  if (!response.ok || data.error) {
-    const requestError = new Error(data.error || `Request failed (${response.status})`);
-    requestError.status = response.status;
-    requestError.retriable = !response.ok && response.status >= 500;
-    throw requestError;
-  }
-  return data;
+  return apiFetchAppsScriptJsonp(endpoint, method, payload);
 }
 
 function apiFetchAppsScriptJsonp(endpoint, method, payload = {}) {
